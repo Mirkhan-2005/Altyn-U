@@ -9,6 +9,8 @@ config = AutoConfig(search_path=str(BASE_DIR.parent))
 
 SECRET_KEY = config('SECRET_KEY')
 
+PLATONUS_ENCRYPTION_KEY = config("PLATONUS_ENCRYPTION_KEY")
+
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = config(

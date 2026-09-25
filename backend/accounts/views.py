@@ -1,6 +1,15 @@
 from rest_framework.parsers import JSONParser
 from rest_framework.views import APIView
 
+from rest_framework.exceptions import APIException
+
+from .serializers import RegistrationCompleteSerializer
+from .services.registration import (
+    issue_registration,
+    complete_registration,
+)
+from .throttles import RegistrationCompleteThrottle
+
 from .serializers import PlatonusVerifySerializer
 from .services.platonus import verify_student
 from .throttles import PlatonusVerifyThrottle
@@ -80,15 +89,41 @@ class PlatonusVerifyView(APIView):
         )
 
         if student_verified:
-            return Response(
+            try:
+                token = issue_registration(
+                    iin=serializer.validated_data["iin"],
+                    platonus_password=serializer.validated_data[
+                        "platonus_password"
+                    ],
+                )
+            except APIException:
+                raise
+            except Exception:
+                return Response(
+                    {
+                        "message": (
+                            "Не удалось подготовить регистрацию. "
+                            "Попробуйте позже."
+                        )
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+            response = Response(
                 {
                     "status": "student_verified",
                     "message": (
                         "Студент подтверждён. "
-                        "Статус обучения: Обучается."
+                        "Создайте пароль для Altyn."
                     ),
+                    "registration_token": token,
+                    "expires_in": 600,
                 }
             )
+
+            response["Cache-Control"] = "no-store"
+
+            return response
 
         if result.status == "requires_code":
             return Response(
@@ -157,3 +192,51 @@ class PlatonusVerifyView(APIView):
             },
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
+    
+
+class RegistrationCompleteView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+    throttle_classes = [RegistrationCompleteThrottle]
+
+    def post(self, request):
+        serializer = RegistrationCompleteSerializer(
+            data=request.data
+        )
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            complete_registration(
+                token=serializer.validated_data[
+                    "registration_token"
+                ],
+                password=serializer.validated_data["password"],
+            )
+        except APIException:
+            raise
+        except Exception:
+            return Response(
+                {
+                    "message": (
+                        "Не удалось завершить регистрацию. "
+                        "Попробуйте позже."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        response = Response(
+            {
+                "status": "registered",
+                "message": (
+                    "Аккаунт Altyn создан. "
+                    "Теперь можно перейти ко входу."
+                ),
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+        response["Cache-Control"] = "no-store"
+
+        return response

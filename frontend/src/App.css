@@ -280,3 +280,29 @@ button:disabled {
   opacity: 0.7;
   cursor: wait;
 }
+
+.consent-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 16px 0 20px;
+  color: #526a61;
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.auth-card .consent-field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  margin: 3px 0 0;
+  padding: 0;
+  flex-shrink: 0;
+  accent-color: #214f3b;
+}
+
+.auth-card input[readonly] {
+  background-color: #f0f3f1;
+  color: #526a61;
+}

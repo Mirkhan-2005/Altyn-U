@@ -13,3 +13,7 @@ class PlatonusVerifyThrottle(SimpleRateThrottle):
             "scope": self.scope,
             "ident": ip_address,
         }
+    
+class RegistrationCompleteThrottle(PlatonusVerifyThrottle):
+    scope = "registration_complete"
+    rate = "10/min"
