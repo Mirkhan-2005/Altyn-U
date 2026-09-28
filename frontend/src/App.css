@@ -513,3 +513,151 @@ body {
     gap: 24px;
   }
 }
+
+
+
+
+
+/* .altyn-site {
+  min-height: 100vh;
+  background: #f5f6f8;
+  color: #1f2937;
+}
+
+.altyn-site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 5%;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.altyn-logo {
+  border: 0;
+  background: transparent;
+  color: #1f2937;
+  font-size: 30px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.altyn-logo span {
+  color: #b58220;
+}
+
+.altyn-site-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.altyn-site-header nav button {
+  padding: 10px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: white;
+  color: #1f2937;
+  cursor: pointer;
+  font: inherit;
+}
+
+.altyn-site-header nav button[aria-current="page"] {
+  background: #fff6df;
+  border-color: #d3a546;
+}
+
+.altyn-content {
+  width: min(1100px, 92%);
+  margin: 32px auto;
+  padding-bottom: 32px;
+}
+
+.altyn-card,
+.altyn-banner {
+  padding: 32px;
+  border-radius: 20px;
+  background: white;
+  border: 1px solid #e5e7eb;
+}
+
+.altyn-banner {
+  background: linear-gradient(125deg, #fff8e7, #fff);
+}
+
+.altyn-banner h1 {
+  margin: 16px 0;
+  font-size: clamp(28px, 4vw, 44px);
+}
+
+.altyn-banner > span {
+  color: #87600f;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.altyn-site .button {
+  width: auto;
+  margin-top: 16px;
+}
+
+.altyn-profile-grid {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 28px;
+  margin: 24px 0;
+}
+
+.altyn-avatar,
+.altyn-avatar-placeholder {
+  width: 150px;
+  height: 150px;
+  border-radius: 20px;
+  object-fit: cover;
+  background: #f0f1f4;
+}
+
+.altyn-avatar-placeholder {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 12px;
+  box-sizing: border-box;
+  color: #667085;
+}
+
+.altyn-profile-details {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+
+.altyn-profile-details div {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 16px;
+}
+
+.altyn-profile-details dt {
+  color: #667085;
+}
+
+.altyn-profile-details dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .altyn-site-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .altyn-card,
+  .altyn-banner {
+    padding: 22px;
+  }
+} */
