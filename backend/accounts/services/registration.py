@@ -13,7 +13,11 @@ from django.utils import timezone
 
 from rest_framework.exceptions import APIException, ValidationError
 
-from ..models import PendingRegistration, PlatonusConnection
+from ..models import (
+    PendingRegistration,
+    PlatonusConnection,
+    StudentProfile,
+)
 
 
 class RegistrationExpired(APIException):
@@ -96,6 +100,7 @@ def complete_registration(token, password):
             {"password": exc.messages}
         ) from None
 
+    # Пароль Altyn сохраняется в виде хеша.
     user.set_password(password)
 
     try:
@@ -112,8 +117,14 @@ def complete_registration(token, password):
             if claimed != 1:
                 raise RegistrationExpired()
 
+            # Создаём пользователя Altyn.
             user.save(force_insert=True)
 
+            # Создаём пустой профиль.
+            # Данные из Platonus загрузит сервис sync_profile().
+            StudentProfile.objects.get_or_create(user=user)
+
+            # Сохраняем зашифрованное подключение к Platonus.
             PlatonusConnection.objects.create(
                 user=user,
                 encrypted_password=pending.encrypted_password,
@@ -122,6 +133,7 @@ def complete_registration(token, password):
                 last_verified_at=pending.created_at,
             )
 
+            # Удаляем подтверждения регистрации для этого ИИН.
             PendingRegistration.objects.filter(
                 iin=pending.iin,
             ).delete()

@@ -306,3 +306,210 @@ button:disabled {
   background-color: #f0f3f1;
   color: #526a61;
 }
+
+body {
+  margin: 0;
+  display: block;
+  min-width: 320px;
+}
+
+#root {
+  width: 100%;
+  max-width: none;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.portal,
+.portal * {
+  box-sizing: border-box;
+}
+
+.portal {
+  min-height: 100vh;
+  background: #f6f5f1;
+  color: #222822;
+  font-family: system-ui, sans-serif;
+}
+
+.portal button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.portal button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.portal button:focus-visible {
+  outline: 3px solid #b68113;
+  outline-offset: 4px;
+}
+
+.portal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px max(5vw, 20px);
+  background: white;
+  border-bottom: 1px solid #e8e8df;
+}
+
+.portal-logo {
+  border: 0;
+  background: none;
+  font-size: 30px !important;
+  font-weight: 800 !important;
+  color: #886217;
+}
+
+.portal-header nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.portal-header nav button {
+  border: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: transparent;
+  color: #34413a;
+}
+
+.portal-header nav button[aria-current="page"] {
+  background: #f5ecd5;
+}
+
+.portal-main {
+  max-width: 1100px;
+  margin: auto;
+  padding: 36px 24px;
+}
+
+.welcome-banner {
+  padding: clamp(24px, 5vw, 64px);
+  border-radius: 24px;
+  background: #193b30;
+  color: white;
+}
+
+.welcome-banner > span {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: #e9cf8d;
+}
+
+.welcome-banner h1 {
+  font-size: clamp(30px, 5vw, 52px);
+  margin: 18px 0;
+}
+
+.welcome-banner p {
+  max-width: 520px;
+  line-height: 1.7;
+  color: #e1ebe5;
+}
+
+.portal-action {
+  border: 0;
+  border-radius: 12px;
+  padding: 13px 20px;
+  background: #ebc76d;
+  color: #282211;
+  font-weight: 600 !important;
+}
+
+.portal-message {
+  padding: 14px 18px;
+  background: #fff4d7;
+  border-radius: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.profile-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 36px;
+  padding: 32px;
+  background: white;
+  border: 1px solid #e6e7df;
+  border-radius: 24px;
+}
+
+.student-photo {
+  width: 180px;
+  height: 220px;
+  flex: 0 0 auto;
+  border-radius: 18px;
+  object-fit: cover;
+  background: #eef0e9;
+}
+
+.photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  color: #626c62;
+}
+
+.profile-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-details dl {
+  margin: 0 0 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.profile-details dt {
+  color: #636d65;
+  font-size: 14px;
+}
+
+.profile-details dd {
+  margin: 5px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.profile-details .gpa-value {
+  font-size: 38px;
+  color: #24503c;
+}
+
+.profile-details > p {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.profile-note {
+  color: #636d65;
+}
+
+@media (max-width: 640px) {
+  .portal-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .portal-main {
+    padding: 24px 16px;
+  }
+
+  .profile-card {
+    flex-direction: column;
+    padding: 24px;
+    gap: 24px;
+  }
+}

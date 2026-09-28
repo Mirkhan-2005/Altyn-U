@@ -1,29 +1,69 @@
-export async function checkBackend() {
-  const response = await fetch("/api/accounts/health/");
+const TOKEN_KEY = "altyn_access";
 
-  if (!response.ok) {
-    throw new Error("Не удалось проверить backend.");
-  }
-
-  return response.json();
+export function getAccessToken() {
+  return sessionStorage.getItem(TOKEN_KEY) || "";
 }
 
-async function postJson(url, payload) {
+export function logoutAltyn() {
+  sessionStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event("altyn:logout"));
+}
+
+async function request(
+  path,
+  {
+    method = "GET",
+    body,
+    auth = false,
+    signal,
+    binary = false,
+  } = {},
+) {
+  const token = auth ? getAccessToken() : "";
+
+  const headers = {
+    Accept: binary ? "*/*" : "application/json",
+  };
+
+  if (body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
   let response;
 
   try {
-    response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(payload),
+    response = await fetch(`/api/accounts/${path}`, {
+      method,
+      headers,
+      signal,
+      credentials: "omit",
+      cache: "no-store",
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
-  } catch {
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw error;
+    }
+
     throw new Error(
       "Нет соединения с сервером Altyn. Попробуйте позже.",
     );
+  }
+
+  if (
+    auth &&
+    response.status === 401 &&
+    getAccessToken() === token
+  ) {
+    logoutAltyn();
+  }
+
+  if (binary && response.ok) {
+    return response.blob();
   }
 
   let data;
@@ -37,34 +77,50 @@ async function postJson(url, payload) {
   }
 
   if (!response.ok) {
-    const fieldErrors = Object.values(data)
+    const fields = Object.values(data || {})
       .filter(Array.isArray)
       .flat()
       .filter((value) => typeof value === "string");
 
-    const message =
-      data.message ||
-      (response.status === 429
-        ? "Слишком много попыток. Подождите немного."
-        : null) ||
-      data.detail ||
-      fieldErrors.join(" ") ||
-      "Не удалось выполнить запрос.";
+    const error = new Error(
+      response.status === 429
+        ? "Слишком много попыток. Повторите позже."
+        : data.message ||
+            data.detail ||
+            fields.join(" ") ||
+            "Запрос не выполнен.",
+    );
 
-    const error = new Error(message);
     error.status = response.status;
-
     throw error;
   }
 
   return data;
 }
 
+export const checkBackend = () => request("health/");
+
+export async function loginAltyn(iin, password) {
+  const data = await request("login/", {
+    method: "POST",
+    body: { iin, password },
+  });
+
+  if (typeof data.access !== "string" || !data.access) {
+    throw new Error("Сервер не вернул подтверждение входа.");
+  }
+
+  sessionStorage.setItem(TOKEN_KEY, data.access);
+}
+
 export async function verifyPlatonus(iin, password, consent) {
-  const data = await postJson("/api/accounts/platonus/verify/", {
-    iin,
-    platonus_password: password,
-    save_platonus_credentials: consent,
+  const data = await request("platonus/verify/", {
+    method: "POST",
+    body: {
+      iin,
+      platonus_password: password,
+      save_platonus_credentials: consent,
+    },
   });
 
   if (
@@ -83,10 +139,13 @@ export async function completeRegistration(
   password,
   passwordConfirm,
 ) {
-  const data = await postJson("/api/accounts/register/complete/", {
-    registration_token: token,
-    password,
-    password_confirm: passwordConfirm,
+  const data = await request("register/complete/", {
+    method: "POST",
+    body: {
+      registration_token: token,
+      password,
+      password_confirm: passwordConfirm,
+    },
   });
 
   if (data.status !== "registered") {
@@ -95,3 +154,22 @@ export async function completeRegistration(
 
   return data;
 }
+
+export const getProfile = (signal) =>
+  request("profile/", {
+    auth: true,
+    signal,
+  });
+
+export const syncProfile = () =>
+  request("profile/sync/", {
+    method: "POST",
+    auth: true,
+  });
+
+export const getPhoto = (signal) =>
+  request("profile/photo/", {
+    auth: true,
+    binary: true,
+    signal,
+  });
