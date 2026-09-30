@@ -331,3 +331,11 @@
     transition: none;
   }
 }
+
+
+
+/* Общие показатели дисциплины в объединённых ячейках. */
+.journal-table td.journal-merged {
+  vertical-align: middle;
+  text-align: center;
+}

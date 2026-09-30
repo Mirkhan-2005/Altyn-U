@@ -5,13 +5,43 @@ import { getJournal, syncJournal } from "../api/journal";
 import "./JournalPage.css";
 
 function formatDate(value) {
-  return value
-    ? new Date(value).toLocaleString("ru-RU")
-    : "Ещё не обновлялось";
+  if (!value) {
+    return "Ещё не обновлялось";
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? "Дата недоступна"
+    : date.toLocaleString("ru-RU");
 }
 
 function JournalTable({ data }) {
   const columns = data.columns.slice(1);
+
+  // Общие показатели дисциплины:
+  // объединяем их по вертикали, если значения совпадают.
+  const subjectColumns = new Set([
+    "ТК1 ОБЩ.",
+    "РК1",
+    "Р1",
+    "ТК2 ОБЩ.",
+    "РК2",
+    "Р2",
+    "Оценка за курсовую работу",
+    "Практика",
+    "Исследоват. работа",
+    "Рейтинг допуска",
+    "Итоговый контроль",
+    "Итоговая оценка / %",
+    "Итоговая оценка / Буквенная",
+  ]);
+
+  function cellText(value) {
+    return value === null || value === undefined
+      ? ""
+      : String(value);
+  }
 
   return (
     <div
@@ -36,8 +66,28 @@ function JournalTable({ data }) {
         </thead>
 
         <tbody>
-          {data.subjects.map((subject, subjectIndex) =>
-            subject.rows.map((row, rowIndex) => (
+          {data.subjects.map((subject, subjectIndex) => {
+            const rows = subject.rows;
+
+            if (!rows.length) {
+              return null;
+            }
+
+            const mergedColumns = new Set(
+              columns.filter((column) => {
+                if (!subjectColumns.has(column)) {
+                  return false;
+                }
+
+                const firstValue = cellText(rows[0][column]);
+
+                return rows.every(
+                  (row) => cellText(row[column]) === firstValue,
+                );
+              }),
+            );
+
+            return rows.map((row, rowIndex) => (
               <tr
                 key={`${subjectIndex}-${rowIndex}`}
                 className={
@@ -49,41 +99,46 @@ function JournalTable({ data }) {
                 {rowIndex === 0 && (
                   <th
                     className="journal-subject"
-                    rowSpan={subject.rows.length}
+                    rowSpan={rows.length}
                   >
                     {subject.name}
                   </th>
                 )}
 
                 {columns.map((column) => {
-                  const value = row[column];
+                  const merged = mergedColumns.has(column);
 
-                  const empty =
-                    value === null ||
-                    value === undefined ||
-                    value === "";
+                  // Ячейка уже показана в первой строке
+                  // и занимает высоту всех строк дисциплины.
+                  if (merged && rowIndex > 0) {
+                    return null;
+                  }
+
+                  const text = cellText(row[column]);
 
                   const unplanned =
-                    String(value)
-                      .toLowerCase()
-                      .replace(/\s/g, "") === "н.п.";
+                    text.toLowerCase().replace(/\s/g, "") === "н.п.";
+
+                  const className = [
+                    merged ? "journal-merged" : "",
+                    unplanned ? "journal-unplanned" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
 
                   return (
                     <td
                       key={column}
-                      className={
-                        unplanned
-                          ? "journal-unplanned"
-                          : undefined
-                      }
+                      rowSpan={merged ? rows.length : undefined}
+                      className={className || undefined}
                     >
-                      {empty ? "" : String(value)}
+                      {text}
                     </td>
                   );
                 })}
               </tr>
-            )),
-          )}
+            ));
+          })}
         </tbody>
       </table>
     </div>
@@ -97,7 +152,6 @@ export default function JournalPage({ onSessionExpired }) {
   const [period, setPeriod] = useState({
     year: 2025,
     term: 2,
-    revision: 0,
   });
 
   const [snapshot, setSnapshot] = useState(null);
@@ -114,17 +168,34 @@ export default function JournalPage({ onSessionExpired }) {
 
   const busy = loading || syncing;
 
+  const validYear =
+    /^[0-9]{4}$/.test(year) &&
+    Number(year) >= 2000 &&
+    Number(year) <= 2100;
+
+  const validTerm =
+    Number.isInteger(Number(term)) &&
+    Number(term) !== 0 &&
+    Math.abs(Number(term)) <= 20;
+
+  const validPeriod = validYear && validTerm;
+
   const changed =
+    !validPeriod ||
     Number(year) !== period.year ||
     Number(term) !== period.term;
 
+  // Загружаем сохранённый журнал из БД.
   useEffect(() => {
     const controller = new AbortController();
+
     controllerRef.current = controller;
 
     getJournal(period.year, period.term, controller.signal)
       .then((data) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) {
+          return;
+        }
 
         setSnapshot(data);
 
@@ -142,13 +213,14 @@ export default function JournalPage({ onSessionExpired }) {
 
         if (error.status === 401) {
           onSessionExpired();
-        } else {
-          setMessage(
-            error.status === 404
-              ? "За этот период журнал ещё не сохранён. Нажмите «Обновить из Platonus»."
-              : error.message,
-          );
+          return;
         }
+
+        setMessage(
+          error.status === 404
+            ? "За этот период журнал ещё не сохранён. Нажмите «Обновить из Platonus»."
+            : error.message || "Не удалось загрузить журнал.",
+        );
       })
       .finally(() => {
         if (!controller.signal.aborted) {
@@ -156,40 +228,51 @@ export default function JournalPage({ onSessionExpired }) {
         }
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+    };
   }, [period, onSessionExpired]);
 
-  function showPeriod(event) {
-    event.preventDefault();
-
-    if (busy) return;
+  // Автоматически переключаем период после изменения фильтров.
+  useEffect(() => {
+    if (!validPeriod || syncing) {
+      return;
+    }
 
     const nextYear = Number(year);
     const nextTerm = Number(term);
 
     if (
-      !Number.isInteger(nextYear) ||
-      nextYear < 2000 ||
-      nextYear > 2100 ||
-      !Number.isInteger(nextTerm) ||
-      nextTerm === 0 ||
-      Math.abs(nextTerm) > 20
+      nextYear === period.year &&
+      nextTerm === period.term
     ) {
-      setMessage("Проверьте учебный год и период.");
       return;
     }
 
-    setSnapshot(null);
-    setMessage("");
-    setLoading(true);
+    const timer = window.setTimeout(() => {
+      setSnapshot(null);
+      setMessage("");
+      setLoading(true);
 
-    setPeriod((current) => ({
-      year: nextYear,
-      term: nextTerm,
-      revision: current.revision + 1,
-    }));
-  }
+      setPeriod({
+        year: nextYear,
+        term: nextTerm,
+      });
+    }, 400);
 
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    year,
+    term,
+    validPeriod,
+    syncing,
+    period.year,
+    period.term,
+  ]);
+
+  // Свежие данные из Platonus получаем только по кнопке.
   async function refreshJournal() {
     const controller = controllerRef.current;
 
@@ -212,7 +295,9 @@ export default function JournalPage({ onSessionExpired }) {
         controller.signal,
       );
 
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) {
+        return;
+      }
 
       setSnapshot(data);
 
@@ -233,7 +318,9 @@ export default function JournalPage({ onSessionExpired }) {
         onSessionExpired();
       } else {
         setMessage(
-          `Обновление не выполнено. ${error.message}`,
+          `Обновление не выполнено. ${
+            error.message || "Попробуйте позже."
+          }`,
         );
       }
     } finally {
@@ -247,10 +334,7 @@ export default function JournalPage({ onSessionExpired }) {
     <section className="journal-page">
       <h1>Мой журнал</h1>
 
-      <form
-        onSubmit={showPeriod}
-        className="journal-filters"
-      >
+      <div className="journal-filters">
         <label htmlFor="journal-year">
           Начало учебного года
 
@@ -263,6 +347,10 @@ export default function JournalPage({ onSessionExpired }) {
             required
             value={year}
             disabled={busy}
+            aria-invalid={!validYear}
+            aria-describedby={
+              !validYear ? "journal-year-error" : undefined
+            }
             onChange={(event) => setYear(event.target.value)}
           />
         </label>
@@ -286,15 +374,13 @@ export default function JournalPage({ onSessionExpired }) {
             ))}
           </select>
         </label>
+      </div>
 
-        <button
-          type="submit"
-          className="portal-action"
-          disabled={busy}
-        >
-          Показать
-        </button>
-      </form>
+      {!validYear && (
+        <p id="journal-year-error" className="profile-note">
+          Введите год из четырёх цифр: от 2000 до 2100.
+        </p>
+      )}
 
       <div className="journal-toolbar">
         <p>
@@ -312,13 +398,13 @@ export default function JournalPage({ onSessionExpired }) {
         </button>
       </div>
 
-      {changed && (
-        <p className="profile-note">
-          Нажмите «Показать», чтобы открыть выбранный период.
-        </p>
-      )}
-
       <div role="status" aria-live="polite">
+        {changed && validPeriod && !busy && (
+          <p className="profile-note">
+            Открываем выбранный период…
+          </p>
+        )}
+
         {loading && (
           <p>Загружаем сохранённый журнал…</p>
         )}
@@ -337,23 +423,24 @@ export default function JournalPage({ onSessionExpired }) {
 
       {snapshot?.has_data ? (
         <>
-          {
           <div className="journal-stats">
             <div className="journal-stat">
-                <span>Дисциплины</span>
-                <strong>{snapshot.data.subjects_count}</strong>
+              <span>Дисциплины</span>
+              <strong>{snapshot.data.subjects_count}</strong>
             </div>
 
             <div className="journal-stat">
-                <span>Строки занятий</span>
-                <strong>{snapshot.data.rows_count}</strong>
+              <span>Строки занятий</span>
+              <strong>{snapshot.data.rows_count}</strong>
             </div>
 
             <div className="journal-stat journal-stat-date">
-                <span>Последнее успешное обновление</span>
-                <strong>{formatDate(snapshot.last_synced_at)}</strong>
+              <span>Последнее успешное обновление</span>
+              <strong>
+                {formatDate(snapshot.last_synced_at)}
+              </strong>
             </div>
-          </div> }
+          </div>
 
           <JournalTable data={snapshot.data} />
 
@@ -364,7 +451,8 @@ export default function JournalPage({ onSessionExpired }) {
           </p>
         </>
       ) : (
-        !loading && (
+        !loading &&
+        !message && (
           <p className="profile-note">
             Сохранённых оценок за этот период пока нет.
           </p>
