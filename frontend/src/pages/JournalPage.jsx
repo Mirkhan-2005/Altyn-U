@@ -414,12 +414,15 @@ export default function JournalPage({ onSessionExpired }) {
         )}
       </div>
 
-      {snapshot?.sync_message &&
-        snapshot.sync_message !== message && (
-          <p className="portal-message">
+        {!loading && !message && snapshot?.sync_message && (
+        <p className="portal-message">
             {snapshot.sync_message}
-          </p>
+        </p>
         )}
+        
+
+
+      
 
       {snapshot?.has_data ? (
         <>

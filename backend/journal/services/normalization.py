@@ -84,9 +84,12 @@ def parse_value(column, position, raw):
         kind = "number"
 
     else:
-        raise JournalImportError(
-            f"Колонка «{column}»: неизвестное обозначение."
-        )
+        # Неизвестное обозначение сохраняем без изменений.
+        # Это не числовая оценка и не ноль.
+        kind = "text"
+
+    
+    
 
     return {
         "source_column": column,
