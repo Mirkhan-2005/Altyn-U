@@ -77,12 +77,33 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+USE_POSTGRES = config(
+    "USE_POSTGRES",
+    default=False,
+    cast=bool,
+)
+
+if USE_POSTGRES:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": config("POSTGRES_DB"),
+            "USER": config("POSTGRES_USER"),
+            "PASSWORD": config("POSTGRES_PASSWORD"),
+            "HOST": config("DB_HOST", default="127.0.0.1"),
+            "PORT": config("DB_PORT", default=5433, cast=int),
+            "OPTIONS": {
+                "connect_timeout": 5,
+            },
+        }
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # DATABASES = {
 #     'default': {
@@ -150,3 +171,39 @@ MEDIA_ROOT = BASE_DIR / "media"
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
 }
+
+
+
+
+
+
+
+# Адрес Redis для отправки фоновых задач.
+CELERY_BROKER_URL = config(
+    "CELERY_BROKER_URL",
+    default="redis://127.0.0.1:6379/0",
+)
+
+# Хранилище результатов задач.
+CELERY_RESULT_BACKEND = config(
+    "CELERY_RESULT_BACKEND",
+    default="redis://127.0.0.1:6379/1",
+)
+
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+
+CELERY_TASK_DEFAULT_QUEUE = "default"
+
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = True
+
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+
+# Worker не забирает заранее большую пачку задач.
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+
+# Результаты задач хранятся один час.
+# Профили и оценки будут храниться в основной БД.
+CELERY_RESULT_EXPIRES = 3600

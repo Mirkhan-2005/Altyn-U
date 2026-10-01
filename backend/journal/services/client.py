@@ -1,7 +1,7 @@
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request
-
+from .periods import parse_periods
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 from django.views.decorators.debug import sensitive_variables
@@ -26,12 +26,16 @@ class JournalSyncError(Exception):
         self.status_code = status_code
 
 
-def fetch_html(client, student_id, year, term):
-    query = urlencode({
-        "studentID": student_id,
-        "year": year,
-        "term": term,
-    })
+def fetch_html(client, student_id, year=None, term=None):
+    params = {"studentID": student_id}
+
+    if year is not None:
+        params["year"] = year
+
+    if term is not None:
+        params["term"] = term
+
+    query = urlencode(params)
 
     headers = {
         "Accept": "text/html",
@@ -61,12 +65,14 @@ def fetch_html(client, student_id, year, term):
             encoding = response.headers.get_content_charset() or "utf-8"
             body = response.read(MAX_HTML + 1)
 
+    
     except HTTPError as exc:
         code = exc.code
         exc.close()
 
         raise JournalSyncError(
-            f"Platonus не отдал журнал: HTTP {code}."
+            f"Platonus не отдал журнал: HTTP {code}.",
+            429 if code == 429 else 503,
         ) from None
 
     except (URLError, TimeoutError, OSError):
@@ -93,7 +99,12 @@ def fetch_html(client, student_id, year, term):
 
 
 @sensitive_variables()
-def download_journal(user, year, term):
+def _download(user, year=None, term=None, *, periods_only=False):
+    if not user.is_active:
+        raise JournalSyncError(
+            "Аккаунт Altyn отключён.",
+            403,
+        )
     connection = PlatonusConnection.objects.filter(
         user=user,
     ).first()
@@ -126,6 +137,12 @@ def download_journal(user, year, term):
             password = None
 
         if login.authenticated is not True:
+            if login.status == "rate_limited":
+                raise JournalSyncError(
+                    "Platonus ограничил запросы. Повторите позже.",
+                    429,
+                )
+
             if login.status == "requires_code":
                 raise JournalSyncError(
                     "Platonus запросил код. Требуется повторное подключение.",
@@ -190,13 +207,21 @@ def download_journal(user, year, term):
             term,
         )
 
+        
         try:
-            data = parse_journal(
-                html,
-                year,
-                term,
-                expected_student_id=student_id,
-            )
+            if periods_only:
+                data = parse_periods(
+                    html,
+                    expected_student_id=student_id,
+                    expected_year=year,
+                )
+            else:
+                data = parse_journal(
+                    html,
+                    year,
+                    term,
+                    expected_student_id=student_id,
+                )
         except JournalError as exc:
             raise JournalSyncError(str(exc), 502) from None
 
@@ -207,3 +232,23 @@ def download_journal(user, year, term):
     )
 
     return data, warning
+
+def download_journal(user, year, term):
+    return _download(user, year, term)
+
+
+def download_periods(user, year=None):
+    if year is not None and (
+        type(year) is not int
+        or not 2000 <= year <= 2100
+    ):
+        raise JournalSyncError(
+            "Некорректный учебный год.",
+            400,
+        )
+
+    return _download(
+        user,
+        year=year,
+        periods_only=True,
+    )
