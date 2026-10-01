@@ -8,7 +8,12 @@ from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
 from rest_framework_simplejwt.tokens import AccessToken
+import logging
 
+from .services.profile_queue import queue_profile
+from .services.profile_sync import SyncError
+
+logger = logging.getLogger(__name__)
 
 class LoginSerializer(serializers.Serializer):
     iin = serializers.RegexField(
@@ -48,6 +53,7 @@ class LoginView(APIView):
             **serializer.validated_data,
         )
 
+
         if user is None or not user.is_active:
             return Response(
                 {"detail": "Неверный ИИН или пароль Altyn."},
@@ -55,7 +61,20 @@ class LoginView(APIView):
                 headers={"Cache-Control": "no-store"},
             )
 
+        try:
+            queue_profile(user)
+        except SyncError:
+            pass
+        except Exception:
+            logger.error(
+                "Не удалось подготовить загрузку профиля user_id=%s",
+                user.pk,
+            )
+
         return Response(
             {"access": str(AccessToken.for_user(user))},
             headers={"Cache-Control": "no-store"},
         )
+
+
+    

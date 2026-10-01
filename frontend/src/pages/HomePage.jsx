@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 import { getProfile } from "../api/client";
 
+import { watchProfile } from "../api/watchProfile";
+
 export default function HomePage({
   onNavigate,
   onSessionExpired,
@@ -11,18 +13,18 @@ export default function HomePage({
   const [message, setMessage] = useState("");
   const [attempt, setAttempt] = useState(0);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
 
-    getProfile(controller.signal)
-      .then((data) => {
-        if (active) {
-          setProfile(data);
-        }
-      })
-      .catch((error) => {
-        if (!active || error.name === "AbortError") return;
+
+
+  useEffect(() => {
+    return watchProfile(
+      (data) => {
+        setProfile(data);
+        setLoading(false);
+        setMessage(data.sync_message || "");
+      },
+      (error) => {
+        setLoading(false);
 
         if (error.status === 401) {
           onSessionExpired();
@@ -31,17 +33,8 @@ export default function HomePage({
             error.message || "Не удалось загрузить профиль.",
           );
         }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-      controller.abort();
-    };
+      },
+    );
   }, [attempt, onSessionExpired]);
 
   return (
@@ -68,6 +61,13 @@ export default function HomePage({
       </section>
 
       <div role="status" aria-live="polite">
+        {profile?.sync_status === "queued" && (
+          <p>Готовим загрузку профиля из Platonus…</p>
+        )}
+
+        {profile?.sync_status === "syncing" && (
+          <p>Загружаем имя, фамилию, GPA и фотографию…</p>
+        )}
         {message && (
           <p className="portal-message">{message}</p>
         )}

@@ -207,3 +207,12 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 # Результаты задач хранятся один час.
 # Профили и оценки будут храниться в основной БД.
 CELERY_RESULT_EXPIRES = 3600
+
+
+
+CELERY_BROKER_CONNECTION_TIMEOUT = 3
+
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "socket_connect_timeout": 3,
+    "socket_timeout": 3,
+}

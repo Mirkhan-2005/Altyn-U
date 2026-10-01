@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import { getProfile, syncProfile } from "../api/client";
+import { syncProfile } from "../api/client";
+import { watchProfile } from "../api/watchProfile";
 import StudentPhoto from "../components/StudentPhoto";
 
 function formatDate(value) {
@@ -22,20 +23,23 @@ export default function ProfilePage({ onSessionExpired }) {
 
   const mounted = useRef(false);
 
+  const profileUpdating =
+    profile?.sync_status === "queued" ||
+    profile?.sync_status === "syncing";
+
+  const busy = loading || syncing || profileUpdating;
+
   useEffect(() => {
     mounted.current = true;
 
-    const controller = new AbortController();
-    let active = true;
-
-    getProfile(controller.signal)
-      .then((data) => {
-        if (active) {
-          setProfile(data);
-        }
-      })
-      .catch((error) => {
-        if (!active || error.name === "AbortError") return;
+    const stop = watchProfile(
+      (data) => {
+        setProfile(data);
+        setLoading(false);
+        setMessage("");
+      },
+      (error) => {
+        setLoading(false);
 
         if (error.status === 401) {
           onSessionExpired();
@@ -44,25 +48,20 @@ export default function ProfilePage({ onSessionExpired }) {
             error.message || "Не удалось загрузить профиль.",
           );
         }
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
+      },
+    );
 
     return () => {
-      active = false;
       mounted.current = false;
-      controller.abort();
+      stop();
     };
   }, [attempt, onSessionExpired]);
 
   async function handleSync() {
-    if (loading || syncing) return;
+    if (busy) return;
 
     setSyncing(true);
-    setMessage("Обновляем данные из Platonus…");
+    setMessage("Отправляем запрос на обновление профиля…");
 
     try {
       const data = await syncProfile();
@@ -70,7 +69,8 @@ export default function ProfilePage({ onSessionExpired }) {
       if (!mounted.current) return;
 
       setProfile(data);
-      setMessage(data.sync_message || "Профиль обновлён.");
+      setMessage("");
+      setAttempt((value) => value + 1);
     } catch (error) {
       if (!mounted.current) return;
 
@@ -102,19 +102,38 @@ export default function ProfilePage({ onSessionExpired }) {
         {message && (
           <p className="portal-message">{message}</p>
         )}
+
+        {profile?.sync_status === "queued" && (
+          <p>Обновление профиля ожидает выполнения…</p>
+        )}
+
+        {profile?.sync_status === "syncing" && (
+          <p>Получаем данные из Platonus…</p>
+        )}
+
+        {profile?.sync_message &&
+          profile.sync_message !== message && (
+            <p className="portal-message">
+              {profile.sync_message}
+            </p>
+          )}
       </div>
 
-      {loading && !profile && (
-        <p>Загружаем сохранённый профиль…</p>
+      {loading && (
+        <p>
+          {profile
+            ? "Проверяем состояние профиля…"
+            : "Загружаем сохранённый профиль…"}
+        </p>
       )}
 
-      {!profile && !loading && (
+      {message && !loading && !syncing && (
         <button
           type="button"
           className="portal-action"
           onClick={retryLoading}
         >
-          Повторить загрузку
+          Повторить загрузку профиля
         </button>
       )}
 
@@ -127,7 +146,7 @@ export default function ProfilePage({ onSessionExpired }) {
             />
           ) : (
             <div className="student-photo photo-placeholder">
-              Нет фото
+              {profileUpdating ? "Загружаем фото…" : "Нет фото"}
             </div>
           )}
 
@@ -177,19 +196,19 @@ export default function ProfilePage({ onSessionExpired }) {
               </p>
             )}
 
-            {profile.sync_message && (
-              <p className="portal-message">
-                {profile.sync_message}
-              </p>
-            )}
-
             <button
               type="button"
               className="portal-action"
-              disabled={syncing}
+              disabled={busy}
               onClick={handleSync}
             >
-              {syncing ? "Обновляем…" : "Обновить из Platonus"}
+              {syncing
+                ? "Отправляем запрос…"
+                : profile.sync_status === "queued"
+                  ? "Ожидаем обновления…"
+                  : profile.sync_status === "syncing"
+                    ? "Обновляем профиль…"
+                    : "Обновить из Platonus"}
             </button>
 
             <p className="profile-note">

@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from .models import StudentProfile
 from .services.profile_sync import SyncError, sync_profile
+from .services.profile_queue import queue_profile
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -72,7 +73,10 @@ class ProfileSyncView(APIView):
 
     def post(self, request):
         try:
-            profile = sync_profile(request.user)
+            profile = queue_profile(
+                request.user,
+                force=True,
+            )
         except SyncError as exc:
             return Response(
                 {"detail": str(exc)},
@@ -80,8 +84,25 @@ class ProfileSyncView(APIView):
                 headers={"Cache-Control": "no-store"},
             )
 
+        if profile.sync_status == "error":
+            return Response(
+                {
+                    "detail": (
+                        profile.sync_message
+                        or "Не удалось запустить обновление."
+                    ),
+                },
+                status=503,
+                headers={"Cache-Control": "no-store"},
+            )
+
         return Response(
             ProfileSerializer(profile).data,
+            status=(
+                202
+                if profile.sync_status in {"queued", "syncing"}
+                else 200
+            ),
             headers={"Cache-Control": "no-store"},
         )
 
