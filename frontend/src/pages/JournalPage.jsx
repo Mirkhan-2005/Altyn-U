@@ -445,7 +445,19 @@ export default function JournalPage({ onSessionExpired }) {
             </div>
           </div>
 
+  
+          {snapshot.data.is_empty === true ? (
+            <p className="portal-message">
+              На момент последней проверки в Platonus за этот
+              период нет дисциплин и оценок. Если они появятся,
+              нажми «Обновить из Platonus».
+            </p>
+          ) : (
           <JournalTable data={snapshot.data} />
+          )}
+          
+
+          
 
           <p className="profile-note">
             Пустые ячейки и обозначения «н» и «н.п.» отображаются

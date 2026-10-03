@@ -134,11 +134,13 @@ def parse_journal(
     years = options("year", year)
     terms = options("term", term)
 
+
+        # Таблица журнала существует даже без строк дисциплин.
     tables = [
         table
         for table in soup.find_all("table")
         if table.select_one("thead")
-        and table.select_one("tr.subject")
+        and "bordered" in table.get("class", [])
     ]
 
     if len(tables) != 1:
@@ -180,12 +182,41 @@ def parse_journal(
             "Найдены повторяющиеся заголовки колонок."
         )
 
-    if not all(
-        str(week) in columns
-        for week in range(1, 16)
-    ):
+    
+    common_columns = {
+        "Дисциплина",
+        "Учебный поток",
+        "Преподаватель",
+        "РК1",
+        "Р1",
+        "РК2",
+        "Р2",
+        "Оценка за курсовую работу",
+        "Практика",
+        "Исследоват. работа",
+        "Рейтинг допуска",
+        "Итоговый контроль",
+        "Итоговая оценка / %",
+        "Итоговая оценка / Буквенная",
+    }
+
+    weekly_columns = {
+        str(week) for week in range(1, 16)
+    } | {"ТК1", "ТК1 ОБЩ.", "ТК2", "ТК2 ОБЩ."}
+
+    full_columns = common_columns | weekly_columns
+
+    # Обычный период содержит недельные колонки.
+    # Дополнительный может иметь сокращённую таблицу.
+    valid_columns = set(columns) == full_columns
+
+    if term < 0 and set(columns) == common_columns:
+        valid_columns = True
+
+    if not valid_columns:
         raise JournalError(
-            "Не найдены все недельные колонки."
+            "Неизвестный набор колонок журнала. "
+            "Разбор остановлен."
         )
 
     body = table.find("tbody")
@@ -193,10 +224,22 @@ def parse_journal(
     if body is None:
         raise JournalError("Строки журнала не найдены.")
 
-    rows = body.find_all("tr", recursive=False)
-    grid = expand_rows(rows)
 
-    if len(grid[0]) != len(columns):
+    
+    rows = body.find_all("tr", recursive=False)
+
+    # Сообщение об ошибке или неизвестная разметка
+    # не должны считаться пустым журналом.
+    if not rows and (
+        body.get_text(strip=True) or body.find(True) is not None
+    ):
+        raise JournalError(
+            "Вместо строк журнала получено неизвестное содержимое."
+        )
+
+    grid = expand_rows(rows) if rows else []
+
+    if grid and len(grid[0]) != len(columns):
         raise JournalError(
             "Число колонок не совпадает с заголовками."
         )
@@ -232,6 +275,8 @@ def parse_journal(
             )
         })
 
+
+
     return {
         "year": year,
         "academic_year": f"{year}–{year + 1}",
@@ -239,6 +284,7 @@ def parse_journal(
         "available_years": years,
         "available_terms": terms,
         "columns": columns,
+        "is_empty": not subjects,
         "subjects_count": len(subjects),
         "rows_count": len(grid),
         "subjects": subjects,

@@ -5,6 +5,13 @@ from django.utils.dateparse import parse_datetime
 from .models import StudentProfile
 from .services.profile_sync import sync_profile
 
+import logging
+
+from journal.services.import_queue import queue_journal_import
+
+
+logger = logging.getLogger(__name__)
+
 
 @shared_task(
     name="accounts.check_queue",
@@ -54,3 +61,12 @@ def sync_profile_task(user_id, requested_at):
     # Используем существующий сервис:
     # имя, фамилия, GPA, фото и сообщения об ошибках.
     sync_profile(user)
+        # Профиль уже сохранён — теперь можно загружать журналы.
+    try:
+        queue_journal_import(user)
+    except Exception:
+        logger.error(
+            "Не удалось подготовить импорт журналов "
+            "после загрузки профиля user_id=%s",
+            user.pk,
+        )

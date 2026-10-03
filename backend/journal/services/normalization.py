@@ -166,9 +166,20 @@ def build_plan(snapshot):
 
     subjects = data.get("subjects")
 
-    if not isinstance(subjects, list) or not subjects:
+    
+    if not isinstance(subjects, list):
         raise JournalImportError(
-            "В журнале нет дисциплин для разбора."
+            "Список дисциплин имеет неверный формат."
+        )
+
+    if not subjects and data.get("is_empty") is not True:
+        raise JournalImportError(
+            "Отсутствие дисциплин не подтверждено парсером."
+        )
+
+    if subjects and data.get("is_empty") is True:
+        raise JournalImportError(
+            "Журнал помечен пустым, но содержит дисциплины."
         )
 
     plan = []

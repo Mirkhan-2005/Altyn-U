@@ -242,3 +242,43 @@ class JournalSubjectValue(JournalValueBase):
                 name="valid_subject_value_kind_number",
             ),
         ]
+
+
+
+class JournalImportState(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="journal_import",
+    )
+
+    status = models.CharField(
+        max_length=16,
+        default="pending",
+    )
+
+    token = models.UUIDField(
+        null=True,
+        editable=False,
+    )
+
+    attempted_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    finished_at = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    report = models.JSONField(
+        default=dict,
+        blank=True,
+    )
+
+    message = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Импорт журналов"
+        verbose_name_plural = "Импорты журналов"

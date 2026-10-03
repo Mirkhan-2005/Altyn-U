@@ -216,3 +216,15 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {
     "socket_connect_timeout": 3,
     "socket_timeout": 3,
 }
+
+
+
+ALTYN_CURRENT_YEAR = config(
+    "ALTYN_CURRENT_YEAR",
+    cast=int,
+)
+
+ALTYN_CURRENT_TERM = config(
+    "ALTYN_CURRENT_TERM",
+    cast=int,
+)
