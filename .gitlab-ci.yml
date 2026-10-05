@@ -1,0 +1,19 @@
+stages:
+  - verify
+
+check_runner:
+  stage: verify
+  image: python:3.12-slim-bookworm
+
+  tags:
+    - saas-linux-small-amd64
+
+  timeout: 5m
+
+  script:
+    - python --version
+    - test -f backend/manage.py
+    - test -f backend/Dockerfile
+    - test -f frontend/Dockerfile
+    - test -f frontend/package-lock.json
+    - echo "Runner works. Project files are available."
