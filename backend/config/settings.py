@@ -140,7 +140,7 @@ USE_I18N = True
 
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
@@ -226,5 +226,26 @@ ALTYN_CURRENT_YEAR = config(
 
 ALTYN_CURRENT_TERM = config(
     "ALTYN_CURRENT_TERM",
+    cast=int,
+)
+
+
+
+# Общий кеш для процессов Django.
+CACHE_URL = config("CACHE_URL", default="")
+
+if CACHE_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": CACHE_URL,
+        }
+    }
+
+# В Docker перед Django находится один прокси — Nginx.
+# При обычном локальном запуске значение остаётся 0.
+REST_FRAMEWORK["NUM_PROXIES"] = config(
+    "NUM_PROXIES",
+    default=0,
     cast=int,
 )

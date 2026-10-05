@@ -1,14 +1,52 @@
+name: altyn
+
+# Общие настройки для backend, worker и init.
+# Здесь нет build, чтобы не собирать один образ одновременно.
+x-backend: &backend-common
+  image: altyn-backend:dev
+
+  init: true
+
+  env_file:
+    - .env
+
+  environment:
+    DEBUG: "False"
+
+    USE_POSTGRES: "True"
+    DB_HOST: db
+    DB_PORT: "5432"
+
+    ALLOWED_HOSTS: "localhost,127.0.0.1,backend"
+
+    CORS_ALLOWED_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080"
+    CSRF_TRUSTED_ORIGINS: "http://localhost:8080,http://127.0.0.1:8080"
+
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CELERY_RESULT_BACKEND: redis://redis:6379/1
+
+    CACHE_URL: redis://redis:6379/2
+    NUM_PROXIES: "1"
+
+  volumes:
+    - ./backend/media:/app/backend/media
+
 services:
   db:
     image: postgres:17-bookworm
+    restart: unless-stopped
+
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+
     ports:
       - "127.0.0.1:5433:5432"
+
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
+
     healthcheck:
       test:
         - CMD-SHELL
@@ -20,25 +58,86 @@ services:
 
   redis:
     image: redis:7.4-alpine
+    restart: unless-stopped
+
     command:
       - redis-server
       - --appendonly
       - "yes"
+
     ports:
       - "127.0.0.1:6379:6379"
+
     volumes:
       - redis_dev_data:/data
+
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        - CMD
+        - redis-cli
+        - ping
       interval: 5s
       timeout: 3s
       retries: 10
 
-  worker:
+  # Подготовка БД и статики Django.
+  # После успешного выполнения завершается с кодом 0.
+  init:
+    <<: *backend-common
+
+    pull_policy: never
+    restart: "no"
+
+    command:
+      - sh
+      - -c
+      - python manage.py migrate --noinput && python manage.py collectstatic --noinput
+
+    volumes:
+      - ./backend/media:/app/backend/media
+      - static_dev_data:/app/backend/staticfiles
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Только этот сервис собирает образ altyn-backend:dev.
+  backend:
+    <<: *backend-common
+
     build:
       context: ./backend
-      dockerfile: Dockerfile.dev
-    working_dir: /app/backend
+      dockerfile: Dockerfile
+
+    restart: unless-stopped
+
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/accounts/health/', timeout=3).close()"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+  worker:
+    <<: *backend-common
+
+    pull_policy: never
+    restart: unless-stopped
+
     command:
       - celery
       - -A
@@ -47,23 +146,57 @@ services:
       - --loglevel=INFO
       - --concurrency=1
       - --queues=default
-    env_file:
-      - .env
-    environment:
-      USE_POSTGRES: "True"
-      DB_HOST: db
-      DB_PORT: "5432"
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/1
-    volumes:
-      - ./backend:/app/backend:ro
-      - ./backend/media:/app/backend/media:rw
+
+    stop_grace_period: 60s
+
     depends_on:
+      init:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
 
+  # Собранный React и Nginx в одном контейнере.
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:8080:80"
+
+    volumes:
+      - static_dev_data:/usr/share/nginx/static:ro
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1/healthz
+      interval: 15s
+      timeout: 3s
+      retries: 5
+
 volumes:
+  # Существующее хранилище PostgreSQL.
   postgres_dev_data:
+    external: true
+    name: altyn_postgres_dev_data
+
+  # Существующее хранилище Redis.
   redis_dev_data:
+    external: true
+    name: altyn_redis_dev_data
+
+  # Статика Django для Nginx.
+  static_dev_data:

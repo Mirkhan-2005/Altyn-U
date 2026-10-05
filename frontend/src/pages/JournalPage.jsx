@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
-import { getJournal, syncJournal } from "../api/journal";
+import useJournal from "../hooks/useJournal";
 
 import "./JournalPage.css";
 
@@ -146,189 +146,89 @@ function JournalTable({ data }) {
 }
 
 export default function JournalPage({ onSessionExpired }) {
-  const [year, setYear] = useState("2025");
-  const [term, setTerm] = useState("2");
+  // null означает: открыть текущий период из настроек backend.
+  const [period, setPeriod] = useState(null);
+  const [filters, setFilters] = useState(null);
 
-  const [period, setPeriod] = useState({
-    year: 2025,
-    term: 2,
-  });
+  const {
+    snapshot,
+    loading,
+    syncing,
+    message,
+    refresh,
+    recheck,
+  } = useJournal(period, onSessionExpired);
 
-  const [snapshot, setSnapshot] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [message, setMessage] = useState("");
+  const year =
+    filters?.year ?? String(snapshot?.year ?? "");
 
-  const [options, setOptions] = useState([
-    { value: "1", label: "1" },
-    { value: "2", label: "2" },
-  ]);
-
-  const controllerRef = useRef(null);
-
-  const busy = loading || syncing;
+  const term =
+    filters?.term ?? String(snapshot?.term ?? "");
 
   const validYear =
     /^[0-9]{4}$/.test(year) &&
     Number(year) >= 2000 &&
     Number(year) <= 2100;
 
-  const validTerm =
+  const validPeriod =
+    validYear &&
     Number.isInteger(Number(term)) &&
     Number(term) !== 0 &&
     Math.abs(Number(term)) <= 20;
 
-  const validPeriod = validYear && validTerm;
+  const selected =
+    period ??
+    (snapshot
+      ? { year: snapshot.year, term: snapshot.term }
+      : null);
 
   const changed =
+    !selected ||
     !validPeriod ||
-    Number(year) !== period.year ||
-    Number(term) !== period.term;
+    Number(year) !== selected.year ||
+    Number(term) !== selected.term;
 
-  // Загружаем сохранённый журнал из БД.
+  const busy = loading || syncing;
+
+  const visible =
+    snapshot &&
+    selected &&
+    snapshot.year === selected.year &&
+    snapshot.term === selected.term
+      ? snapshot
+      : null;
+
+  const options = visible?.data?.available_terms?.length
+    ? visible.data.available_terms
+    : [
+        { value: "1", label: "1" },
+        { value: "2", label: "2" },
+        { value: "-1", label: "Дополнительный 1" },
+        { value: "-2", label: "Дополнительный 2" },
+      ];
+
   useEffect(() => {
-    const controller = new AbortController();
+    if (!filters || !validPeriod || syncing) return;
 
-    controllerRef.current = controller;
-
-    getJournal(period.year, period.term, controller.signal)
-      .then((data) => {
-        if (controller.signal.aborted) {
-          return;
-        }
-
-        setSnapshot(data);
-
-        if (data.data?.available_terms?.length) {
-          setOptions(data.data.available_terms);
-        }
-      })
-      .catch((error) => {
-        if (
-          controller.signal.aborted ||
-          error.name === "AbortError"
-        ) {
-          return;
-        }
-
-        if (error.status === 401) {
-          onSessionExpired();
-          return;
-        }
-
-        setMessage(
-          error.status === 404
-            ? "За этот период журнал ещё не сохранён. Нажмите «Обновить из Platonus»."
-            : error.message || "Не удалось загрузить журнал.",
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, [period, onSessionExpired]);
-
-  // Автоматически переключаем период после изменения фильтров.
-  useEffect(() => {
-    if (!validPeriod || syncing) {
-      return;
-    }
-
-    const nextYear = Number(year);
-    const nextTerm = Number(term);
+    const nextYear = Number(filters.year);
+    const nextTerm = Number(filters.term);
 
     if (
-      nextYear === period.year &&
-      nextTerm === period.term
+      period?.year === nextYear &&
+      period?.term === nextTerm
     ) {
       return;
     }
 
-    const timer = window.setTimeout(() => {
-      setSnapshot(null);
-      setMessage("");
-      setLoading(true);
-
+    const timer = setTimeout(() => {
       setPeriod({
         year: nextYear,
         term: nextTerm,
       });
     }, 400);
 
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [
-    year,
-    term,
-    validPeriod,
-    syncing,
-    period.year,
-    period.term,
-  ]);
-
-  // Свежие данные из Platonus получаем только по кнопке.
-  async function refreshJournal() {
-    const controller = controllerRef.current;
-
-    if (
-      busy ||
-      changed ||
-      !controller ||
-      controller.signal.aborted
-    ) {
-      return;
-    }
-
-    setSyncing(true);
-    setMessage("Получаем свежий журнал из Platonus…");
-
-    try {
-      const data = await syncJournal(
-        period.year,
-        period.term,
-        controller.signal,
-      );
-
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      setSnapshot(data);
-
-      if (data.data?.available_terms?.length) {
-        setOptions(data.data.available_terms);
-      }
-
-      setMessage(data.sync_message || "Журнал обновлён.");
-    } catch (error) {
-      if (
-        controller.signal.aborted ||
-        error.name === "AbortError"
-      ) {
-        return;
-      }
-
-      if (error.status === 401) {
-        onSessionExpired();
-      } else {
-        setMessage(
-          `Обновление не выполнено. ${
-            error.message || "Попробуйте позже."
-          }`,
-        );
-      }
-    } finally {
-      if (!controller.signal.aborted) {
-        setSyncing(false);
-      }
-    }
-  }
+    return () => clearTimeout(timer);
+  }, [filters, validPeriod, syncing, period]);
 
   return (
     <section className="journal-page">
@@ -344,14 +244,15 @@ export default function JournalPage({ onSessionExpired }) {
             min="2000"
             max="2100"
             step="1"
-            required
             value={year}
-            disabled={busy}
-            aria-invalid={!validYear}
-            aria-describedby={
-              !validYear ? "journal-year-error" : undefined
+            disabled={busy || !selected}
+            aria-invalid={Boolean(year) && !validYear}
+            onChange={(event) =>
+              setFilters({
+                year: event.target.value,
+                term,
+              })
             }
-            onChange={(event) => setYear(event.target.value)}
           />
         </label>
 
@@ -361,9 +262,25 @@ export default function JournalPage({ onSessionExpired }) {
           <select
             id="journal-term"
             value={term}
-            disabled={busy}
-            onChange={(event) => setTerm(event.target.value)}
+            disabled={busy || !selected}
+            onChange={(event) =>
+              setFilters({
+                year,
+                term: event.target.value,
+              })
+            }
           >
+            {!term && (
+              <option value="">Загрузка…</option>
+            )}
+
+            {term &&
+              !options.some(
+                (option) => String(option.value) === term,
+              ) && (
+                <option value={term}>{term}</option>
+              )}
+
             {options.map((option) => (
               <option
                 key={option.value}
@@ -376,100 +293,118 @@ export default function JournalPage({ onSessionExpired }) {
         </label>
       </div>
 
-      {!validYear && (
-        <p id="journal-year-error" className="profile-note">
-          Введите год из четырёх цифр: от 2000 до 2100.
+      {year && !validYear && (
+        <p className="profile-note">
+          Введите год от 2000 до 2100.
         </p>
       )}
 
       <div className="journal-toolbar">
         <p>
-          Открыт {period.year}–{period.year + 1},
-          период {period.term}
+          {selected
+            ? `Открыт ${selected.year}–${selected.year + 1}, период ${selected.term}`
+            : "Определяем текущий период…"}
         </p>
 
         <button
           type="button"
           className="portal-action"
-          disabled={busy || changed}
-          onClick={refreshJournal}
+          disabled={busy || changed || !visible}
+          onClick={refresh}
         >
-          {syncing ? "Обновляем…" : "Обновить из Platonus"}
+          {syncing
+            ? "Обновляем…"
+            : "Обновить из Platonus"}
         </button>
       </div>
 
       <div role="status" aria-live="polite">
-        {changed && validPeriod && !busy && (
-          <p className="profile-note">
-            Открываем выбранный период…
-          </p>
-        )}
-
         {loading && (
           <p>Загружаем сохранённый журнал…</p>
+        )}
+
+        {visible?.refresh_pending && (
+          <p>
+            Журнал обновляется в фоне.
+            Пока показаны сохранённые данные.
+          </p>
         )}
 
         {message && (
           <p className="portal-message">{message}</p>
         )}
+
+        {visible?.auto_message && (
+          <p className="portal-message">
+            {visible.auto_message}
+          </p>
+        )}
+
+        {visible?.sync_message &&
+          visible.sync_message !== message && (
+            <p className="portal-message">
+              {visible.sync_message}
+            </p>
+          )}
       </div>
 
-        {!loading && !message && snapshot?.sync_message && (
-        <p className="portal-message">
-            {snapshot.sync_message}
-        </p>
-        )}
-        
+      {!busy && (
+        <button
+          type="button"
+          className="portal-action"
+          disabled={Boolean(selected) && changed}
+          onClick={recheck}
+        >
+          Проверить состояние
+        </button>
+      )}
 
-
-      
-
-      {snapshot?.has_data ? (
+      {visible?.has_data ? (
         <>
           <div className="journal-stats">
             <div className="journal-stat">
               <span>Дисциплины</span>
-              <strong>{snapshot.data.subjects_count}</strong>
+              <strong>
+                {visible.data.subjects_count}
+              </strong>
             </div>
 
             <div className="journal-stat">
               <span>Строки занятий</span>
-              <strong>{snapshot.data.rows_count}</strong>
+              <strong>
+                {visible.data.rows_count}
+              </strong>
             </div>
 
             <div className="journal-stat journal-stat-date">
-              <span>Последнее успешное обновление</span>
+              <span>
+                Последнее успешное обновление
+              </span>
+
               <strong>
-                {formatDate(snapshot.last_synced_at)}
+                {formatDate(visible.last_synced_at)}
               </strong>
             </div>
           </div>
 
-  
-          {snapshot.data.is_empty === true ? (
+          {visible.data.is_empty === true ? (
             <p className="portal-message">
-              На момент последней проверки в Platonus за этот
-              период нет дисциплин и оценок. Если они появятся,
-              нажми «Обновить из Platonus».
+              На момент последней проверки за этот
+              период нет дисциплин и оценок.
             </p>
           ) : (
-          <JournalTable data={snapshot.data} />
+            <JournalTable data={visible.data} />
           )}
-          
-
-          
 
           <p className="profile-note">
-            Пустые ячейки и обозначения «н» и «н.п.» отображаются
-            как в Platonus. При ошибке обновления здесь остаются
-            последние сохранённые оценки.
+            При недоступности Platonus последние
+            сохранённые оценки остаются здесь.
           </p>
         </>
       ) : (
-        !loading &&
-        !message && (
+        !loading && (
           <p className="profile-note">
-            Сохранённых оценок за этот период пока нет.
+            Журнал за этот период пока не сохранён.
           </p>
         )
       )}

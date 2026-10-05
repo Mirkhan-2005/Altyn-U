@@ -2,24 +2,55 @@ import logging
 from datetime import timedelta
 from uuid import uuid4
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import PlatonusConnection, StudentProfile
-from journal.models import JournalImportState
+from journal.models import JournalImportState, JournalSnapshot
 
 
 logger = logging.getLogger(__name__)
 
 
-def queue_journal_import(user):
+def is_current(year, term):
+    return (year, term) == (
+        settings.ALTYN_CURRENT_YEAR,
+        settings.ALTYN_CURRENT_TERM,
+    )
+
+
+def is_fresh(snapshot, now):
+    return bool(
+        snapshot
+        and snapshot.last_synced_at
+        and snapshot.last_synced_at > now - timedelta(minutes=15)
+    )
+
+
+def import_active(state, now):
+    if not state or not state.attempted_at:
+        return False
+
+    minutes = {
+        "queued": 5,
+        "running": 30,
+    }.get(state.status)
+
+    return bool(
+        minutes
+        and state.attempted_at > now - timedelta(minutes=minutes)
+    )
+
+
+def queue_journal_import(user, *, current_only=False):
     if not user.is_active:
         return
 
     if not PlatonusConnection.objects.filter(user=user).exists():
         return
 
-    # Сначала должен завершиться первоначальный импорт профиля.
+    # Профиль должен загрузиться раньше журналов.
     profile_ready = (
         StudentProfile.objects
         .filter(
@@ -46,26 +77,48 @@ def queue_journal_import(user):
 
         now = timezone.now()
 
-        if state.attempted_at:
-            # Не запускаем второй импорт одновременно с первым.
-            # Зависшую попытку можно заменить при следующем
-            # входе спустя 30 минут.
+        # Несколько вкладок используют одну задачу.
+        if import_active(state, now):
+            return
+
+        if current_only:
+            snapshot = JournalSnapshot.objects.filter(
+                user=user,
+                year=settings.ALTYN_CURRENT_YEAR,
+                term=settings.ALTYN_CURRENT_TERM,
+            ).first()
+
+            if is_fresh(snapshot, now):
+                return
+
+            # Например, пользователь уже обновляет журнал вручную.
             if (
-                state.status in {"queued", "running"}
-                and state.attempted_at
-                > now - timedelta(minutes=30)
+                snapshot
+                and snapshot.sync_token
+                and snapshot.last_sync_attempt_at
+                and snapshot.last_sync_attempt_at
+                > now - timedelta(minutes=5)
             ):
                 return
 
-            # После завершения или ошибки — пауза 15 минут.
+            # При ошибке даём Platonus минуту перед новой
+            # автоматической попыткой. Ручная кнопка доступна.
+            if (
+                state.status in {"error", "partial"}
+                and state.finished_at
+                and state.finished_at
+                > now - timedelta(minutes=1)
+            ):
+                return
+
+        if state.attempted_at and not current_only:
             last_activity = (
                 state.finished_at or state.attempted_at
             )
 
             if (
                 state.status not in {"queued", "running"}
-                and last_activity
-                > now - timedelta(minutes=15)
+                and last_activity > now - timedelta(minutes=15)
             ):
                 return
 
@@ -75,7 +128,7 @@ def queue_journal_import(user):
         state.status = "queued"
         state.attempted_at = now
         state.finished_at = None
-        state.report = {}
+        state.report = {"current_only": current_only}
         state.message = ""
 
         state.save(
@@ -96,11 +149,12 @@ def queue_journal_import(user):
                 from journal.tasks import import_journals_task
 
                 import_journals_task.apply_async(
-                    args=[user_id, str(token)],
+                    args=[user_id, str(token), current_only],
                     queue="default",
                     expires=300,
                     retry=False,
                 )
+
             except Exception:
                 JournalImportState.objects.filter(
                     user_id=user_id,
@@ -109,14 +163,11 @@ def queue_journal_import(user):
                 ).update(
                     status="error",
                     finished_at=timezone.now(),
-                    message=(
-                        "Не удалось отправить импорт в очередь."
-                    ),
+                    message="Не удалось отправить импорт в очередь.",
                 )
 
                 logger.error(
-                    "Не удалось поставить импорт журналов "
-                    "user_id=%s",
+                    "Не удалось поставить импорт журналов user_id=%s",
                     user_id,
                 )
 

@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
     soft_time_limit=900,
     time_limit=960,
 )
-def import_journals_task(user_id, token):
+def import_journals_task(user_id, token, current_only=False):
     owned = JournalImportState.objects.filter(
         user_id=user_id,
         token=token,
@@ -41,6 +41,7 @@ def import_journals_task(user_id, token):
         return
 
     report = {
+        "current_only": current_only,
         "total": 0,
         "saved": 0,
         "skipped": 0,
@@ -93,7 +94,16 @@ def import_journals_task(user_id, token):
                 500,
             )
 
-        periods, warnings = discover_periods(user)
+        if current_only:
+            periods = [
+                {
+                    "year": current[0],
+                    "term": current[1],
+                },
+            ]
+            warnings = []
+        else:
+            periods, warnings = discover_periods(user)
 
         report["total"] = len(periods)
         report["warnings"] = warnings

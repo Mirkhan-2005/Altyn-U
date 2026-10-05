@@ -122,3 +122,36 @@ export async function syncJournal(year, term, signal) {
 
   return validateJournal(data, year, term);
 }
+
+
+
+export async function getJournalState(year, term, signal) {
+  const query =
+    year == null || term == null
+      ? ""
+      : `?${new URLSearchParams({ year, term })}`;
+
+  const data = await journalRequest(
+    `/api/journal/auto-sync/${query}`,
+    { signal },
+  );
+
+  return validateJournal(
+    data,
+    year ?? data.year,
+    term ?? data.term,
+  );
+}
+
+export async function autoSyncJournal(year, term, signal) {
+  const data = await journalRequest(
+    "/api/journal/auto-sync/",
+    {
+      method: "POST",
+      body: { year, term },
+      signal,
+    },
+  );
+
+  return validateJournal(data, year, term);
+}

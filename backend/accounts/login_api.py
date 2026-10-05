@@ -37,13 +37,11 @@ class LoginThrottle(SimpleRateThrottle):
     scope = "altyn_login"
     rate = "5/min"
 
+    
     def get_cache_key(self, request, view):
         return self.cache_format % {
             "scope": self.scope,
-            "ident": request.META.get(
-                "REMOTE_ADDR",
-                "unknown",
-            ),
+            "ident": self.get_ident(request),
         }
 
 

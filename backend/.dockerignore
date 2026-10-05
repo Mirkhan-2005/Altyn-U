@@ -8,4 +8,6 @@ __pycache__/
 *.sqlite3-*
 media/
 staticfiles/
+backups/
 .git/
+.pytest_cache/

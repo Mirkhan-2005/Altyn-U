@@ -1,5 +1,6 @@
 from django.urls import path
 
+from .auto_api import JournalAutoSyncView
 from .views import JournalView, JournalSyncView
 
 
@@ -15,5 +16,10 @@ urlpatterns = [
         "sync/",
         JournalSyncView.as_view(),
         name="sync",
+    ),
+    path(
+        "auto-sync/",
+        JournalAutoSyncView.as_view(),
+        name="auto-sync",
     ),
 ]
