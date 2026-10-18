@@ -1,0 +1,142 @@
+.calculator-page > .profile-note {
+  margin: 12px 0 20px;
+}
+
+.calculator-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.calculator-results {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(240px, 1fr)
+  );
+  gap: 14px;
+  margin: 24px 0;
+}
+
+.calculator-result {
+  padding: 20px;
+  background: white;
+  border: 1px solid #dce5d8;
+  border-radius: 16px;
+}
+
+.calculator-result h2 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.calculator-result > span,
+.calculator-result small {
+  color: #5b6c60;
+  font-size: 12px;
+}
+
+.calculator-result strong {
+  display: block;
+  margin: 8px 0;
+  color: #24503c;
+  font-size: 28px;
+}
+
+.calculator-result p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.calculator-table td.calculator-editable {
+  padding: 6px;
+  background: #fff8e6;
+}
+
+.calculator-editable input {
+  box-sizing: border-box;
+  width: 76px;
+  height: 44px;
+  padding: 5px;
+  border: 1px solid #cfb86c;
+  border-radius: 7px;
+  background: #fffdf6;
+  color: #3c3520;
+  font: inherit;
+  text-align: center;
+}
+
+.calculator-editable input:focus {
+  outline: 3px solid #d9b45070;
+  outline-offset: 1px;
+}
+
+.calculator-editable input[aria-invalid="true"] {
+  border: 2px solid #b42318;
+  background: #fff0ed;
+}
+
+.calculator-table td.calculator-derived {
+  background: #eaf3e7;
+  color: #24503c;
+  font-weight: 650;
+}
+
+@media (max-width: 640px) {
+  .calculator-results {
+    grid-template-columns: 1fr;
+  }
+
+  .calculator-actions > button {
+    width: 100%;
+  }
+}
+
+
+.calculator-table td.calculator-editable {
+  background: #ffffff;
+}
+
+.calculator-input-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+}
+
+.calculator-editable input {
+  border-color: #ccd8cc;
+  background: #ffffff;
+}
+
+.calculator-editable input[data-overridden="true"] {
+  border-color: #b98b29;
+  background: #fff1c5;
+}
+
+.calculator-editable input[aria-invalid="true"] {
+  border: 2px solid #b42318;
+  background: #fff0ed;
+}
+
+.calculator-restore {
+  max-width: 100px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: #786023;
+  font-size: 11px !important;
+  overflow-wrap: anywhere;
+}
+
+.calculator-restore:hover {
+  text-decoration: underline;
+}
+
+.calculator-field-error {
+  max-width: 100px;
+  color: #b42318;
+  font-size: 11px;
+  line-height: 1.4;
+}

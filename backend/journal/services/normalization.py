@@ -14,6 +14,8 @@ from journal.models import (
     JournalSubjectValue,
 )
 
+from teachers.services import get_or_create_teacher
+
 
 class JournalImportError(ValueError):
     pass
@@ -358,11 +360,16 @@ def normalize_journal(snapshot_id, *, dry_run=False):
         )
 
         for row in item["rows"]:
+            teacher = get_or_create_teacher(
+                row["teacher_label"],
+            )
+
             lesson = JournalLessonRow.objects.create(
                 subject=subject,
                 position=row["position"],
                 stream_label=row["stream_label"],
                 teacher_label=row["teacher_label"],
+                teacher=teacher,
             )
 
             JournalRowValue.objects.bulk_create(

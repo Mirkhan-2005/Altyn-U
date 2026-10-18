@@ -3,7 +3,27 @@ export default function SiteLayout({
   onNavigate,
   onLogout,
   children,
+  mainClassName = "",
 }) {
+  const navigation = [
+    { page: "home", label: "Главная" },
+    { page: "profile", label: "Профиль" },
+    { page: "journal", label: "Журнал" },
+    { page: "teachers", label: "Преподаватели" },
+    { page: "calculator", label: "Журнал-калькулятор" },
+  ];
+
+  
+  const mainClasses = [
+    "portal-main",
+    page === "journal" || page === "calculator"
+      ? "portal-main-journal"
+      : "",
+    mainClassName,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div className="portal">
       <header className="portal-header">
@@ -16,48 +36,31 @@ export default function SiteLayout({
         </button>
 
         <nav aria-label="Главное меню">
-          <button
-            type="button"
-            aria-current={page === "home" ? "page" : undefined}
-            onClick={() => onNavigate("home")}
-          >
-            Главная
-          </button>
+          {navigation.map((item) => (
+            <button
+              key={item.page}
+              type="button"
+              aria-current={
+                page === item.page ? "page" : undefined
+              }
+              onClick={() => onNavigate(item.page)}
+            >
+              {item.label}
+            </button>
+          ))}
 
           <button
             type="button"
-            aria-current={page === "profile" ? "page" : undefined}
-            onClick={() => onNavigate("profile")}
+            onClick={() => onLogout()}
           >
-            Профиль
-          </button>
-          
-          <button
-            type="button"
-            aria-current={page === "journal" ? "page" : undefined}
-            onClick={() => onNavigate("journal")}
-          >
-            Журнал
-          </button>
-
-          
-
-          <button type="button" onClick={() => onLogout()}>
             Выйти
           </button>
         </nav>
       </header>
 
-
-
-      <main className={
-            page === "journal"
-            ? "portal-main portal-main-journal"
-            : "portal-main"
-        }
-        >
+      <main className={mainClasses}>
         {children}
-</main>
+      </main>
     </div>
   );
 }

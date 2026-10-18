@@ -99,6 +99,15 @@ class JournalLessonRow(models.Model):
         blank=True,
     )
 
+    teacher = models.ForeignKey(
+        "teachers.Teacher",
+        verbose_name="Преподаватель",
+        on_delete=models.SET_NULL,
+        related_name="lesson_rows",
+        null=True,
+        blank=True,
+    )
+
     class Meta:
         verbose_name = "Строка занятий"
         verbose_name_plural = "Строки занятий"

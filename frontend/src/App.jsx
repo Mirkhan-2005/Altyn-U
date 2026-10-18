@@ -653,15 +653,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
 import { useCallback, useEffect, useState } from "react";
 
 import { getAccessToken, logoutAltyn } from "./api/client";
@@ -673,9 +664,10 @@ import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
-
 import JournalPage from "./pages/JournalPage";
-
+import TeachersPage from "./pages/TeachersPage";
+import TeacherDetailPage from "./pages/TeacherDetailPage";
+import JournalCalculatorPage from "./pages/JournalCalculatorPage";
 
 import "./App.css";
 
@@ -685,13 +677,21 @@ const titles = {
   home: "Главная",
   profile: "Профиль",
   journal: "Журнал",
+  teachers: "Преподаватели",
+  calculator: "Журнал-калькулятор",
 };
 
-function resolvePage(requested) {
-  const page = Object.hasOwn(titles, requested)
-    ? requested
-    : "home";
+function getTeacherId(page) {
+  const match = /^teachers\/([1-9][0-9]*)$/.exec(page);
+  return match ? match[1] : null;
+}
 
+function resolvePage(requested) {
+  const knownPage =
+    Object.hasOwn(titles, requested) ||
+    getTeacherId(requested) !== null;
+
+  const page = knownPage ? requested : "home";
   const publicPage = page === "login" || page === "register";
 
   if (!getAccessToken()) {
@@ -710,6 +710,8 @@ function readPage() {
 export default function App() {
   const [page, setPage] = useState(readPage);
   const [notice, setNotice] = useState("");
+
+  const teacherId = getTeacherId(page);
 
   const navigate = useCallback(
     (nextPage, message = "", replace = false) => {
@@ -758,9 +760,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.title = `${titles[page]} — Altyn`;
+    const title = teacherId
+      ? "Преподаватель"
+      : titles[page];
+
+    document.title = `${title} — Altyn`;
     window.history.replaceState({}, "", `/${page}`);
-  }, [page]);
+  }, [page, teacherId]);
 
   if (page === "login" || page === "register") {
     return (
@@ -783,16 +789,34 @@ export default function App() {
 
   return (
     <SiteLayout
-      page={page}
+      page={teacherId ? "teachers" : page}
       onNavigate={navigate}
       onLogout={handleLogout}
+      mainClassName={
+        page === "teachers" ? "portal-main-teachers" : ""
+      }
     >
-      {page === "profile" ? (
+      {teacherId ? (
+        <TeacherDetailPage
+          key={teacherId}
+          teacherId={teacherId}
+          onNavigate={navigate}
+          onSessionExpired={handleSessionExpired}
+        />
+      ) : page === "profile" ? (
         <ProfilePage
           onSessionExpired={handleSessionExpired}
         />
       ) : page === "journal" ? (
         <JournalPage
+          onSessionExpired={handleSessionExpired}
+        />
+      ) : page === "calculator" ? (
+        <JournalCalculatorPage
+          onSessionExpired={handleSessionExpired}
+        />
+      ) : page === "teachers" ? (
+        <TeachersPage
           onSessionExpired={handleSessionExpired}
         />
       ) : (
@@ -803,4 +827,4 @@ export default function App() {
       )}
     </SiteLayout>
   );
-  }
+}

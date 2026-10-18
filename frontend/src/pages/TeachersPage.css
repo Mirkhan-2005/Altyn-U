@@ -1,0 +1,279 @@
+.teachers-page h1 {
+  margin-top: 0;
+  color: #20392e;
+}
+
+.teachers-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 28px 0 22px;
+}
+
+.teachers-search > div {
+  flex: 1 1 260px;
+}
+
+.teachers-search label {
+  display: block;
+  margin-bottom: 8px;
+  color: #526a61;
+  font-size: 14px;
+}
+
+.teachers-search input {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 14px;
+  border: 1px solid #cfd9cf;
+  border-radius: 12px;
+  background: white;
+  color: #20392e;
+  font: inherit;
+}
+
+.teachers-search input:focus-visible {
+  outline: 3px solid #b68113;
+  outline-offset: 2px;
+}
+
+.teachers-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.teacher-card {
+  padding: 22px;
+  border: 1px solid #e2e6dc;
+  border-radius: 20px;
+  background: white;
+}
+
+.teacher-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.teacher-photo {
+  display: block;
+  width: 72px;
+  height: 90px;
+  flex: 0 0 72px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #eaf0e9;
+}
+
+.teacher-photo-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #315a42;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.teacher-name {
+  min-width: 0;
+}
+
+.teacher-name h2 {
+  margin: 0;
+  color: #20392e;
+  font-size: 18px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.teacher-name p {
+  margin: 7px 0 0;
+  color: #68766b;
+  font-size: 13px;
+}
+
+.teacher-subjects {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #edf0e9;
+}
+
+.teacher-subjects h3 {
+  margin: 0 0 10px;
+  color: #647369;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.teacher-subjects summary {
+  color: #315a42;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.teacher-subjects ul {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+.teacher-subjects li {
+  margin-bottom: 8px;
+  color: #46554a;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.teachers-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.teachers-empty {
+  padding: 28px;
+  border-radius: 16px;
+  background: white;
+  color: #647369;
+}
+
+@media (max-width: 1000px) {
+  .teachers-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .teachers-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Широкая страница списка преподавателей. */
+.portal-main.portal-main-teachers {
+  width: 100%;
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 32px clamp(16px, 3vw, 48px);
+}
+
+.portal-main-teachers .teachers-page {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Телефон: одна карточка в ряд. */
+.portal-main-teachers .teachers-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.portal-main-teachers .teacher-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px;
+}
+
+.portal-main-teachers .teacher-card-heading {
+  gap: 14px;
+}
+
+.portal-main-teachers .teacher-name {
+  min-width: 0;
+}
+
+.portal-main-teachers .teacher-name h2 {
+  font-size: 17px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.portal-main-teachers .teacher-subjects {
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-main-teachers .teacher-subjects summary {
+  overflow-wrap: anywhere;
+}
+
+.portal-main-teachers .teacher-details-link {
+  align-self: flex-start;
+  margin-top: 18px;
+  padding: 8px 0;
+}
+
+/* Поиск не растягиваем на всю ширину большого монитора. */
+.portal-main-teachers .teachers-search {
+  width: 100%;
+  max-width: 1000px;
+}
+
+.portal-main-teachers .teachers-search > div {
+  min-width: 0;
+}
+
+.portal-main-teachers .teachers-search input {
+  min-width: 0;
+  font-size: 16px;
+}
+
+/* Две колонки. */
+@media (min-width: 600px) {
+  .portal-main-teachers .teachers-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Три колонки. */
+@media (min-width: 900px) {
+  .portal-main-teachers .teachers-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Четыре колонки. */
+@media (min-width: 1200px) {
+  .portal-main-teachers .teachers-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Пять колонок. */
+@media (min-width: 1440px) {
+  .portal-main-teachers .teachers-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 599px) {
+  .portal-main.portal-main-teachers {
+    padding: 24px 16px;
+  }
+
+  .portal-main-teachers .teachers-search {
+    gap: 10px;
+  }
+
+  .portal-main-teachers .teachers-search > div {
+    flex-basis: 100%;
+  }
+
+  .portal-main-teachers .teachers-search > button {
+    flex: 1;
+    min-height: 46px;
+  }
+
+  .portal-main-teachers .teachers-pagination {
+    gap: 12px;
+  }
+}
