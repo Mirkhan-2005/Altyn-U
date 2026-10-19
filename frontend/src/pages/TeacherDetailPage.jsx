@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { getTeacher } from "../api/teachers";
 import TeacherPhoto from "../components/TeacherPhoto";
+import TeacherAverage from "../components/TeacherAverage";
 
 import "./TeachersPage.css";
 import "./TeacherDetailPage.css";
@@ -124,6 +125,7 @@ function TeacherDetails({
           )}
 
           <p>Предметов в сохранённых журналах: {teaching.length}</p>
+          <TeacherAverage statistics={teacher.grade_statistics} />
 
           {sourceUrl && (
             <a

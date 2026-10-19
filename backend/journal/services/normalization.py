@@ -12,6 +12,7 @@ from journal.models import (
     JournalLessonRow,
     JournalRowValue,
     JournalSubjectValue,
+    JournalPeriodCompletion,
 )
 
 from teachers.services import get_or_create_teacher
@@ -335,6 +336,11 @@ def normalize_journal(snapshot_id, *, dry_run=False):
 
     if dry_run:
         return counts
+    
+    JournalPeriodCompletion.objects.get_or_create(
+        year=snapshot.year,
+        term=snapshot.term,
+    )
 
     # Пересоздаём только производные записи выбранного журнала.
     # Сам JournalSnapshot и его исходный JSON не удаляются.

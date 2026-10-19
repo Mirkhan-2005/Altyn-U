@@ -1,5 +1,72 @@
 from django.conf import settings
 from django.db import models
+from django.core.validators import MaxValueValidator, MinValueValidator
+
+class JournalPeriodCompletion(models.Model):
+    year = models.PositiveSmallIntegerField(
+        "Начало учебного года",
+        validators=[
+            MinValueValidator(2000),
+            MaxValueValidator(2100),
+        ],
+    )
+
+    term = models.SmallIntegerField(
+        "Академический период",
+        validators=[
+            MinValueValidator(-20),
+            MaxValueValidator(20),
+        ],
+        help_text="Код периода Platonus; 0 не допускается.",
+    )
+
+    tk1_completed = models.BooleanField(
+        "ТК1 завершён",
+        default=False,
+        help_text=(
+            "Включить сохранённые ТК1 этого периода "
+            "в средний балл преподавателей."
+        ),
+    )
+
+    tk2_completed = models.BooleanField(
+        "ТК2 завершён",
+        default=False,
+        help_text=(
+            "Включить сохранённые ТК2 этого периода "
+            "в средний балл преподавателей."
+        ),
+    )
+
+    class Meta:
+        verbose_name = "Завершение ТК по периоду"
+        verbose_name_plural = "Завершение ТК по периодам"
+
+        ordering = ["-year", "term"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["year", "term"],
+                name="unique_journal_period_completion",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    year__gte=2000,
+                    year__lte=2100,
+                ),
+                name="valid_completion_year",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(term__gte=-20, term__lte=20)
+                    & ~models.Q(term=0)
+                ),
+                name="valid_completion_term",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.year}–{self.year + 1}, период {self.term}"
 
 
 class JournalSnapshot(models.Model):

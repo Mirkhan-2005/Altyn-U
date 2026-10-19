@@ -16,6 +16,7 @@ from .serializers import (
     TeacherSerializer,
 )
 
+from .statistics import get_teacher_grade_statistics
 
 class TeacherPagination(PageNumberPagination):
     page_size = 15
@@ -86,6 +87,9 @@ class TeacherListView(APIView):
             many=True,
             context={
                 "subjects_by_teacher": subjects_by_teacher,
+                "statistics_by_teacher": (
+                    get_teacher_grade_statistics(teacher_ids)
+                ),
             },
         )
 
@@ -197,6 +201,9 @@ class TeacherDetailView(APIView):
                         for item in teaching
                     ],
                 },
+                "statistics_by_teacher": (
+                    get_teacher_grade_statistics([teacher.pk])
+                ),
             },
         )
 

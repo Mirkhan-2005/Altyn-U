@@ -277,3 +277,38 @@
     gap: 12px;
   }
 }
+
+
+
+
+.teacher-average {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f0f5ed;
+  color: #20392e;
+}
+
+.teacher-average-label,
+.teacher-average-note {
+  color: #526a61;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.teacher-average-value {
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.teacher-average-value span {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.teacher-average-empty {
+  font-size: 14px;
+  line-height: 1.5;
+}

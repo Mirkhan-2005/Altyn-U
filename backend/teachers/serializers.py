@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import Teacher
+from .statistics import empty_statistics
 
 
 class TeacherQuerySerializer(serializers.Serializer):
@@ -15,9 +16,11 @@ class TeacherQuerySerializer(serializers.Serializer):
 class TeacherSerializer(serializers.ModelSerializer):
     subjects = serializers.SerializerMethodField()
     photo_url = serializers.SerializerMethodField()
+    grade_statistics = serializers.SerializerMethodField()
 
     class Meta:
         model = Teacher
+
         fields = (
             "id",
             "display_name",
@@ -25,6 +28,7 @@ class TeacherSerializer(serializers.ModelSerializer):
             "subjects",
             "photo_url",
             "photo_updated_at",
+            "grade_statistics",
         )
 
     def get_subjects(self, obj):
@@ -38,3 +42,12 @@ class TeacherSerializer(serializers.ModelSerializer):
             return None
 
         return f"/api/teachers/{obj.pk}/photo/"
+
+    def get_grade_statistics(self, obj):
+        return self.context.get(
+            "statistics_by_teacher",
+            {},
+        ).get(
+            obj.pk,
+            empty_statistics(),
+        )

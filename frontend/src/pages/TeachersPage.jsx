@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { getTeachers } from "../api/teachers";
 import TeacherPhoto from "../components/TeacherPhoto";
+import TeacherAverage from "../components/TeacherAverage";
 
 import "./TeachersPage.css";
 
@@ -103,6 +104,7 @@ function TeacherResults({
                   )}
               </div>
             </div>
+            <TeacherAverage statistics={teacher.grade_statistics} />
 
             <div className="teacher-subjects">
               <h3>Предметы в сохранённых журналах</h3>
