@@ -3,34 +3,10 @@ import json
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import JournalPeriodCompletion, JournalSnapshot
+from .models import JournalSnapshot
 
-@admin.register(JournalPeriodCompletion)
-class JournalPeriodCompletionAdmin(admin.ModelAdmin):
-    list_display = (
-        "__str__",
-        "tk1_completed",
-        "tk2_completed",
-    )
 
-    list_filter = (
-        "year",
-        "term",
-        "tk1_completed",
-        "tk2_completed",
-    )
 
-    fields = (
-        "year",
-        "term",
-        "tk1_completed",
-        "tk2_completed",
-    )
-
-    def get_readonly_fields(self, request, obj=None):
-        return ("year", "term") if obj else ()
-    
-    
 @admin.register(JournalSnapshot)
 class JournalSnapshotAdmin(admin.ModelAdmin):
     list_display = (

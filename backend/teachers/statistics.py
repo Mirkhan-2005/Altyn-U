@@ -1,12 +1,11 @@
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 
-from journal.models import (
-    JournalPeriodCompletion,
-    JournalRowValue,
-)
+from journal.models import JournalRowValue
 
 
 def empty_statistics():
@@ -30,42 +29,37 @@ def get_teacher_grade_statistics(teacher_ids):
     if not result:
         return result
 
-    periods = (
-        JournalPeriodCompletion.objects
-        .filter(
-            Q(tk1_completed=True)
-            | Q(tk2_completed=True)
+    current_year = settings.ALTYN_CURRENT_YEAR
+    current_term = settings.ALTYN_CURRENT_TERM
+
+    if (
+        type(current_year) is not int
+        or not 2000 <= current_year <= 2100
+        or type(current_term) is not int
+        or current_term not in (1, 2)
+    ):
+        raise ImproperlyConfigured(
+            "Для автоматической статистики задайте "
+            "ALTYN_CURRENT_YEAR от 2000 до 2100 "
+            "и ALTYN_CURRENT_TERM равным 1 или 2."
         )
-        .values_list(
-            "year",
-            "term",
-            "tk1_completed",
-            "tk2_completed",
+
+    # Только обычные периоды, предшествующие текущему.
+    eligible = (
+        Q(lesson_row__subject__snapshot__year__lt=current_year)
+        | Q(
+            lesson_row__subject__snapshot__year=current_year,
+            lesson_row__subject__snapshot__term__lt=current_term,
         )
     )
-
-    # Пока не найден закрытый ТК, выборка остаётся пустой.
-    eligible = Q(pk__in=[])
-
-    for year, term, first, second in periods:
-        columns = []
-
-        if first:
-            columns.append("ТК1")
-
-        if second:
-            columns.append("ТК2")
-
-        eligible |= Q(
-            lesson_row__subject__snapshot__year=year,
-            lesson_row__subject__snapshot__term=term,
-            source_column__in=columns,
-        )
 
     values = (
         JournalRowValue.objects
         .filter(
             eligible,
+            lesson_row__subject__snapshot__year__gte=2000,
+            lesson_row__subject__snapshot__term__in=(1, 2),
+            source_column__in=("ТК1", "ТК2"),
             lesson_row__teacher_id__in=result,
             lesson_row__subject__snapshot__last_synced_at__isnull=False,
             lesson_row__subject__snapshot__user__is_active=True,
@@ -85,7 +79,7 @@ def get_teacher_grade_statistics(teacher_ids):
         )
     )
 
-    # 1. Собираем завершённые ТК каждой строки занятий.
+    # 1. Усредняем доступные ТК строки за прошлый период.
     rows = defaultdict(list)
 
     for teacher, student, year, term, subject, row, value in values.iterator():
