@@ -5,9 +5,9 @@ class PlatonusVerifyThrottle(SimpleRateThrottle):
     scope = "platonus_verify"
     rate = "5/min"
 
+    
     def get_cache_key(self, request, view):
-        # Для текущего локального запуска без reverse proxy.
-        ip_address = request.META.get("REMOTE_ADDR", "unknown")
+        ip_address = self.get_ident(request)
 
         return self.cache_format % {
             "scope": self.scope,

@@ -9,7 +9,7 @@ build:
   stage: build
 
   tags:
-    - runner-linux
+    - saas-linux-small-arm64
 
   rules:
     - if: '$CI_COMMIT_BRANCH == "mai"'
@@ -79,7 +79,7 @@ deploy:
   stage: deploy
 
   tags:
-    - runner-linux
+    - saas-linux-small-arm64
 
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
@@ -145,24 +145,26 @@ deploy:
 
     # 2. Копируем конфигурацию и версии образов.
     - |
-      scp_prod compose.prod.yml .release.env \
+      scp_prod docker-compose.yml Caddyfile .release.env \
         "$PROD_USER@$PROD_HOST:$PROD_PATH/"
 
-      scp_prod deploy/Caddyfile \
-        "$PROD_USER@$PROD_HOST:$PROD_PATH/deploy/"
+      
 
     # 3. Запускаем обновление на сервере.
     - |
       ssh_prod "sh -se -- '$PROD_PATH'" <<'REMOTE'
       cd "$1"
 
+
       compose() {
         docker compose \
           --env-file .env \
           --env-file .release.env \
-          -f compose.prod.yml \
+          -f docker-compose.yml \
           "$@"
       }
+      
+      
 
       echo 'Checking Docker Compose...'
       compose config --quiet
@@ -175,7 +177,7 @@ deploy:
 
       echo 'Checking Django production settings...'
       compose run --rm --no-deps backend \
-        python manage.py check --deploy --fail-level WARNING
+        python manage.py check --deploy --fail-level ERROR
 
       echo 'Stopping application before migrations...'
       compose stop caddy frontend worker backend

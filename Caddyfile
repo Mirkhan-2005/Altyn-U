@@ -1,4 +1,6 @@
 {$ALTYN_DOMAIN} {
+    header Strict-Transport-Security "max-age=3600"
+
     reverse_proxy frontend:80 {
         header_up X-Forwarded-For {http.request.remote.host}
         header_up X-Forwarded-Proto {scheme}
