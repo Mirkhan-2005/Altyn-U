@@ -1,0 +1,6 @@
+{$ALTYN_DOMAIN} {
+    reverse_proxy frontend:80 {
+        header_up X-Forwarded-For {http.request.remote.host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

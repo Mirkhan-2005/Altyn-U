@@ -1,0 +1,331 @@
+name: altyn-prod
+
+services:
+
+  # ==========================================
+  # 1. PostgreSQL
+  # ==========================================
+  db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - database_network
+
+  # ==========================================
+  # 2. Redis — очередь Celery и общий кеш
+  # ==========================================
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+
+    volumes:
+      - redis_data:/data
+
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - database_network
+
+  # ==========================================
+  # 3. Миграции и сборка Django static
+  # ==========================================
+  init:
+    image: ${BACKEND_IMAGE:?required}
+    restart: "no"
+    init: true
+
+    env_file:
+      - .env
+
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings_prod
+      USE_POSTGRES: "True"
+
+      DB_HOST: db
+      DB_PORT: "5432"
+
+      ALLOWED_HOSTS: "${ALTYN_DOMAIN:?required},backend,localhost,127.0.0.1"
+      CORS_ALLOWED_ORIGINS: "https://${ALTYN_DOMAIN}"
+      CSRF_TRUSTED_ORIGINS: "https://${ALTYN_DOMAIN}"
+
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CACHE_URL: redis://redis:6379/2
+
+    command:
+      - sh
+      - -ec
+      - |
+        python manage.py migrate --noinput
+        python manage.py collectstatic --noinput
+
+    volumes:
+      - media_data:/app/backend/media
+      - static_data:/app/backend/staticfiles
+
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - web_network
+      - database_network
+
+  # ==========================================
+  # 4. Django + Gunicorn
+  # ==========================================
+  backend:
+    image: ${BACKEND_IMAGE:?required}
+    restart: unless-stopped
+    init: true
+
+    env_file:
+      - .env
+
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings_prod
+      USE_POSTGRES: "True"
+
+      DB_HOST: db
+      DB_PORT: "5432"
+
+      ALLOWED_HOSTS: "${ALTYN_DOMAIN:?required},backend,localhost,127.0.0.1"
+      CORS_ALLOWED_ORIGINS: "https://${ALTYN_DOMAIN}"
+      CSRF_TRUSTED_ORIGINS: "https://${ALTYN_DOMAIN}"
+
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CACHE_URL: redis://redis:6379/2
+
+    volumes:
+      - media_data:/app/backend/media
+
+    expose:
+      - "8000"
+
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/accounts/health/', timeout=3).close()"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - web_network
+      - database_network
+
+  # ==========================================
+  # 5. Celery — фоновые задачи Altyn
+  # ==========================================
+  worker:
+    image: ${BACKEND_IMAGE:?required}
+    restart: unless-stopped
+    init: true
+
+    env_file:
+      - .env
+
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings_prod
+      USE_POSTGRES: "True"
+
+      DB_HOST: db
+      DB_PORT: "5432"
+
+      ALLOWED_HOSTS: "${ALTYN_DOMAIN:?required},backend,localhost,127.0.0.1"
+      CORS_ALLOWED_ORIGINS: "https://${ALTYN_DOMAIN}"
+      CSRF_TRUSTED_ORIGINS: "https://${ALTYN_DOMAIN}"
+
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      CACHE_URL: redis://redis:6379/2
+
+    command:
+      - celery
+      - -A
+      - config
+      - worker
+      - --loglevel=INFO
+      - --concurrency=1
+      - --queues=default
+
+    volumes:
+      - media_data:/app/backend/media
+
+    stop_grace_period: 60s
+
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - web_network
+      - database_network
+
+  # ==========================================
+  # 6. React + Nginx
+  # ==========================================
+  frontend:
+    image: ${FRONTEND_IMAGE:?required}
+    restart: unless-stopped
+
+    volumes:
+      - static_data:/usr/share/nginx/static:ro
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1/healthz
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - proxy_network
+      - web_network
+
+  # ==========================================
+  # 7. Caddy — внешний доступ и HTTPS
+  # ==========================================
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    environment:
+      ALTYN_DOMAIN: ${ALTYN_DOMAIN:?required}
+
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+    depends_on:
+      frontend:
+        condition: service_healthy
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    networks:
+      - proxy_network
+
+# ==========================================
+# Постоянные хранилища
+# ==========================================
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:
+  static_data:
+  caddy_data:
+  caddy_config:
+
+# ==========================================
+# Docker Networks
+# ==========================================
+networks:
+
+  # Caddy взаимодействует с Nginx.
+  proxy_network:
+    driver: bridge
+
+  # Nginx взаимодействует с Django.
+  # Django и Celery имеют исходящий доступ к Platonus.
+  web_network:
+    driver: bridge
+
+  # PostgreSQL и Redis доступны внутри этой сети.
+  database_network:
+    driver: bridge
+    internal: true

@@ -36,7 +36,7 @@ export default function TeacherAverage({ statistics }) {
       )}
 
       <span className="teacher-average-note">
-        Только завершённые ТК · все периоды
+        ТК1/ТК2 прошлых обычных периодов · текущий исключён
       </span>
     </div>
   );
