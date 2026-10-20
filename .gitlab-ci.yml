@@ -12,7 +12,7 @@ build:
     - saas-linux-small-arm64
 
   rules:
-    - if: '$CI_COMMIT_BRANCH == "mai"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
 
   timeout: 30m
 
