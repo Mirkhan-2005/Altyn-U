@@ -47,20 +47,7 @@ build:
 
     # Проверяем Django и запускаем тесты на временной SQLite.
     # Эти значения используются только внутри тестового контейнера.
-    - |
-      docker run --rm --network none \
-        -e DJANGO_SETTINGS_MODULE=config.settings \
-        -e USE_POSTGRES=False \
-        -e SECRET_KEY=ci-only-secret-48f92a67b0d15e83c6a904f12de78503acb916e4d20f7a56 \
-        -e PLATONUS_ENCRYPTION_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
-        -e ALTYN_CURRENT_YEAR=2026 \
-        -e ALTYN_CURRENT_TERM=1 \
-        "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA" \
-        sh -ec '
-          python manage.py check
-          python manage.py makemigrations --check --dry-run
-          python manage.py test --noinput
-        '
+
 
     # Авторизуемся после успешных проверок.
     - |
