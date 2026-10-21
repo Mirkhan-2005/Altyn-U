@@ -112,7 +112,7 @@ deploy:
   timeout: 15m
   interruptible: false
 
-  # Не допускаем два одновременных deploy.
+  # Не допускаем два одновременных deploy
   resource_group: production
 
   environment:
