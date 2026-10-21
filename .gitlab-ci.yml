@@ -8,13 +8,28 @@ stages:
 build:
   stage: build
 
+  image: docker:28-cli
+
   tags:
-    - saas-linux-small-arm64
+    - saas-linux-small-amd64
+
+  services:
+    - name: docker:28-dind
+      alias: docker
+      command: ["--mtu=1400"]
+      variables:
+        HEALTHCHECK_TCP_PORT: "2375"
+
+  variables:
+    DOCKER_HOST: "tcp://docker:2375"
+    DOCKER_TLS_CERTDIR: ""
 
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
 
   timeout: 30m
+
+  # Ниже оставь существующие script, artifacts и after_script.
 
   script:
     # Отдельный каталог Docker credentials для этого job.
@@ -78,8 +93,10 @@ build:
 deploy:
   stage: deploy
 
+  image: debian:bookworm-slim
+
   tags:
-    - saas-linux-small-arm64
+    - saas-linux-small-amd64
 
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
@@ -102,11 +119,16 @@ deploy:
     name: production
     url: https://altyn.dpdns.org
 
+
   before_script:
-    # Проверяем настройки подключения.
+    - apt-get update
+    - apt-get install -y --no-install-recommends openssh-client curl ca-certificates
+
+    # Далее идут существующие проверки:
     - test -n "$PROD_HOST"
     - test -n "$PROD_USER"
     - test -n "$PROD_PATH"
+
 
     # Разрешаем абсолютный путь без пробелов и shell-символов.
     - '[[ "$PROD_PATH" =~ ^/[a-zA-Z0-9_/-]+$ ]]'
