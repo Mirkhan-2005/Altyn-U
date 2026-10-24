@@ -45,8 +45,7 @@ build:
     # Собираем frontend с production-конфигурацией Nginx.
     - docker build --pull -t "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA" ./frontend
 
-    # Проверяем Django и запускаем тесты на временной SQLite.
-    # Эти значения используются только внутри тестового контейнера.
+
 
 
     # Авторизуемся после успешных проверок.

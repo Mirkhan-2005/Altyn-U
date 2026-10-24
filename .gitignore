@@ -81,3 +81,5 @@ celerybeat-schedule
 celerybeat-schedule-wal
 
 /backups/
+
+.env.prod
