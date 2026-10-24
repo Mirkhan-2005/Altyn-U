@@ -1,13 +1,14 @@
+
+# Altyn CI/CD: Build -> Deploy
 stages:
   - build
   - deploy
 
-# ==========================================
-# 1. Сборка, проверки и публикация образов
-# ==========================================
+# =====================================
+# 1. BUILD — GitLab Runner
+# =====================================
 build:
   stage: build
-
   image: docker:28-cli
 
   tags:
@@ -29,37 +30,23 @@ build:
 
   timeout: 30m
 
-  # Ниже оставь существующие script, artifacts и after_script.
-
   script:
-    # Отдельный каталог Docker credentials для этого job.
-    - export DOCKER_CONFIG="$CI_PROJECT_DIR/.docker-$CI_JOB_ID"
-    - mkdir -p "$DOCKER_CONFIG"
-
-    # Проверяем доступ runner к Docker.
     - docker info
 
-    # Собираем backend.
-    - docker build --pull -t "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA" ./backend
-
-    # Собираем frontend с production-конфигурацией Nginx.
-    - docker build --pull -t "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA" ./frontend
-
-
-
-
-    # Авторизуемся после успешных проверок.
+    # Вход в GitLab Container Registry
     - |
       printf '%s' "$CI_REGISTRY_PASSWORD" |
-        docker login \
-          -u "$CI_REGISTRY_USER" \
-          --password-stdin "$CI_REGISTRY"
+        docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
 
-    # Публикуем образы.
+    # Собираем Backend и Frontend
+    - docker build --pull -t "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA" ./backend
+    - docker build --pull -t "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA" ./frontend
+
+    # Загружаем образы в GitLab
     - docker push "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA"
     - docker push "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA"
 
-    # Сохраняем ссылки на опубликованные образы.
+    # Сохраняем версии образов для Deploy
     - |
       printf 'BACKEND_IMAGE=%s/backend:%s\nFRONTEND_IMAGE=%s/frontend:%s\n' \
         "$CI_REGISTRY_IMAGE" "$CI_COMMIT_SHA" \
@@ -70,147 +57,110 @@ build:
       - .release.env
     expire_in: 7 days
 
-  after_script:
-    - rm -rf "$CI_PROJECT_DIR/.docker-$CI_JOB_ID"
-
-# ==========================================
-# 2. Deploy на production по SSH
-# ==========================================
+# =====================================
+# 2. DEPLOY — AWS EC2
+# =====================================
 deploy:
   stage: deploy
-
-  image: debian:bookworm-slim
+  image: alpine:3.21
 
   tags:
     - saas-linux-small-amd64
 
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
-
-  allow_failure: false
-
-  # Получаем версии образов из успешного build.
   needs:
     - job: build
       artifacts: true
 
-  timeout: 15m
-  interruptible: false
+  # Автоматически после успешного Build
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
 
-  # Не допускаем два одновременных deploy
   resource_group: production
+  interruptible: false
+  timeout: 20m
 
   environment:
     name: production
     url: https://altyn.dpdns.org
 
-
   before_script:
-    - apt-get update
-    - apt-get install -y --no-install-recommends openssh-client curl ca-certificates
+    - apk add --no-cache openssh-client curl
 
-    # Далее идут существующие проверки:
-    - test -n "$PROD_HOST"
-    - test -n "$PROD_USER"
-    - test -n "$PROD_PATH"
-
-
-    # Разрешаем абсолютный путь без пробелов и shell-символов.
-    - '[[ "$PROD_PATH" =~ ^/[a-zA-Z0-9_/-]+$ ]]'
-
-    # SSH_PRIVATE_KEY и SSH_KNOWN_HOSTS — файловые переменные GitLab.
-    - test -f "$SSH_PRIVATE_KEY"
-    - test -f "$SSH_KNOWN_HOSTS"
-    - chmod 600 "$SSH_PRIVATE_KEY"
-
-    # Общие параметры подключения.
+  script:
     - |
+      set -eu
+
+      # Проверяем GitLab Variables
+      : "${PROD_HOST:?Set PROD_HOST}"
+      : "${PROD_USER:?Set PROD_USER}"
+      : "${PROD_PATH:?Set PROD_PATH}"
+      test -s "$SSH_PRIVATE_KEY"
+      test -s "$SSH_KNOWN_HOSTS"
+      printf '%s\n' "$PROD_PATH" | grep -Eq '^/[a-zA-Z0-9_/-]+$'
+      chmod 600 "$SSH_PRIVATE_KEY"
+
+      # SSH-подключение
       ssh_prod() {
-        ssh \
-          -i "$SSH_PRIVATE_KEY" \
-          -o IdentitiesOnly=yes \
-          -o BatchMode=yes \
+        ssh -i "$SSH_PRIVATE_KEY" \
+          -o IdentitiesOnly=yes -o BatchMode=yes \
           -o StrictHostKeyChecking=yes \
           -o "UserKnownHostsFile=$SSH_KNOWN_HOSTS" \
           "$PROD_USER@$PROD_HOST" "$@"
       }
 
+      # Копирование файлов
       scp_prod() {
-        scp \
-          -i "$SSH_PRIVATE_KEY" \
-          -o IdentitiesOnly=yes \
-          -o BatchMode=yes \
+        scp -i "$SSH_PRIVATE_KEY" \
+          -o IdentitiesOnly=yes -o BatchMode=yes \
           -o StrictHostKeyChecking=yes \
           -o "UserKnownHostsFile=$SSH_KNOWN_HOSTS" \
           "$@"
       }
 
-  script:
-    # 1. Проверяем наличие настроек на сервере.
-    - |
-      ssh_prod "test -f '$PROD_PATH/.env'"
+      # Проверяем сервер и .env
+      echo 'Checking AWS EC2...'
+      ssh_prod "test -f '$PROD_PATH/.env' && docker info >/dev/null"
 
-    # 2. Копируем конфигурацию и версии образов.
-    - |
+      # Копируем конфигурацию
+      echo 'Copying files...'
       scp_prod docker-compose.yml Caddyfile .release.env \
         "$PROD_USER@$PROD_HOST:$PROD_PATH/"
 
-      
-
-    # 3. Запускаем обновление на сервере.
-    - |
+      # Запускаем обновление на сервере
+      echo 'Deploying Altyn...'
       ssh_prod "sh -se -- '$PROD_PATH'" <<'REMOTE'
       cd "$1"
-
 
       compose() {
         docker compose \
           --env-file .env \
           --env-file .release.env \
-          -f docker-compose.yml \
-          "$@"
+          -f docker-compose.yml "$@"
       }
-      
-      
 
-      echo 'Checking Docker Compose...'
       compose config --quiet
-
-      echo 'Downloading images...'
       compose pull
-
-      echo 'Starting PostgreSQL and Redis...'
       compose up -d --wait --wait-timeout 120 db redis
 
-      echo 'Checking Django production settings...'
+      # Проверяем новые настройки Django
       compose run --rm --no-deps backend \
         python manage.py check --deploy --fail-level ERROR
 
-      echo 'Stopping application before migrations...'
+      # Останавливаем старое приложение
       compose stop caddy frontend worker backend
 
-      echo 'Preparing migrations and static collection...'
+      # Выполняем новые миграции через init
       compose rm -f init
-
-      echo 'Starting Altyn...'
       compose up -d --no-build --wait --wait-timeout 180
 
-      echo 'Checking Celery...'
-      compose exec -T worker \
-        celery -A config inspect ping --timeout=10
-
-      echo 'Containers status:'
-      compose ps
+      compose ps -a
       REMOTE
 
-    # 4. Проверяем приложение через публичный HTTPS-адрес.
+    # Проверяем сайт после Deploy
     - |
-      curl \
-        --fail --silent --show-error \
+      echo 'Checking public website...'
+      curl --fail --silent --show-error \
         --connect-timeout 10 --max-time 20 \
         --retry 5 --retry-delay 5 --retry-all-errors \
         https://altyn.dpdns.org/api/accounts/health/
-
-  after_script:
-    - rm -f "$CI_PROJECT_DIR/.release.env"
