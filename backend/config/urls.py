@@ -1,10 +1,17 @@
 from django.contrib import admin
 from django.urls import include, path
 
+from accounts.smartgate_api import SmartGateConnectionView
+
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/accounts/", include("accounts.urls")),
     path("api/journal/", include("journal.urls")),
     path("api/teachers/", include("teachers.urls")),
+    path(
+    "api/integrations/smartgate/connection",
+    SmartGateConnectionView.as_view(),
+    name="smartgate-connection",
+),
 ]
