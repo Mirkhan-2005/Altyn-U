@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import RegexValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
 from .managers import UserManager
@@ -90,3 +90,67 @@ class StudentProfile(models.Model):
 
     sync_status = models.CharField(max_length=16, default="pending")
     sync_message = models.TextField(blank=True)
+
+
+
+        # Дополнительные сведения о студенте.
+    middle_name = models.CharField(
+        verbose_name="Отчество",
+        max_length=150,
+        blank=True,
+        default="",
+    )
+
+    faculty = models.CharField(
+        verbose_name="Факультет",
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    course = models.PositiveSmallIntegerField(
+        verbose_name="Курс",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1)],
+    )
+
+    # Управляемый статус студента в Altyn.
+    student_status = models.CharField(
+        verbose_name="Статус студента",
+        max_length=16,
+        choices=[
+            ("active", "Активен"),
+            ("inactive", "Неактивен"),
+            ("blocked", "Заблокирован"),
+        ],
+        default="active",
+    )
+
+    # Отдельное согласие для интеграции со SmartGate.
+    smartgate_consent_at = models.DateTimeField(
+        verbose_name="Дата согласия на SmartGate",
+        null=True,
+        blank=True,
+    )
+
+    smartgate_consent_version = models.CharField(
+        verbose_name="Версия текста согласия SmartGate",
+        max_length=64,
+        blank=True,
+        default="",
+    )
+
+    smartgate_consent_reference = models.CharField(
+        verbose_name="Идентификатор подтверждения согласия",
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Номер документа или записи, подтверждающей согласие.",
+    )
+
+    smartgate_consent_revoked_at = models.DateTimeField(
+        verbose_name="Дата отзыва согласия SmartGate",
+        null=True,
+        blank=True,
+    )

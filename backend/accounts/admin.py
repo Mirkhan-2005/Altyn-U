@@ -5,6 +5,9 @@ from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 
 from .models import StudentProfile
 
+from django import forms
+from django.utils import timezone
+
 
 User = get_user_model()
 
@@ -116,16 +119,93 @@ class AltynUserAdmin(UserAdmin):
         return fields
 
 
+SMARTGATE_PROFILE_FIELDS = (
+    "middle_name",
+    "faculty",
+    "course",
+    "student_status",
+    "smartgate_consent_at",
+    "smartgate_consent_version",
+    "smartgate_consent_reference",
+    "smartgate_consent_revoked_at",
+)
+
+
+class StudentProfileAdminForm(forms.ModelForm):
+    class Meta:
+        model = StudentProfile
+        fields = SMARTGATE_PROFILE_FIELDS
+
+    def clean(self):
+        cleaned = super().clean()
+
+        consent_at = cleaned.get("smartgate_consent_at")
+        version = cleaned.get("smartgate_consent_version")
+        reference = cleaned.get("smartgate_consent_reference")
+        revoked_at = cleaned.get("smartgate_consent_revoked_at")
+
+        now = timezone.now()
+
+        if consent_at:
+            if consent_at > now:
+                self.add_error(
+                    "smartgate_consent_at",
+                    "Дата согласия не может быть в будущем.",
+                )
+
+            if not version:
+                self.add_error(
+                    "smartgate_consent_version",
+                    "Укажите версию текста полученного согласия.",
+                )
+
+            if not reference:
+                self.add_error(
+                    "smartgate_consent_reference",
+                    "Укажите номер документа или записи согласия.",
+                )
+
+        elif version or reference or revoked_at:
+            self.add_error(
+                "smartgate_consent_at",
+                "Укажите дату получения согласия.",
+            )
+
+        if revoked_at:
+            if revoked_at > now:
+                self.add_error(
+                    "smartgate_consent_revoked_at",
+                    "Дата отзыва не может быть в будущем.",
+                )
+
+            if consent_at and revoked_at < consent_at:
+                self.add_error(
+                    "smartgate_consent_revoked_at",
+                    "Дата отзыва не может быть раньше согласия.",
+                )
+
+        return cleaned
+
+
 @admin.register(StudentProfile)
 class StudentProfileAdmin(admin.ModelAdmin):
+    form = StudentProfileAdminForm
+
     list_display = (
         "user",
+        "student_status",
+        "faculty",
+        "course",
         "gpa",
         "sync_status",
         "last_synced_at",
     )
 
-    list_filter = ("sync_status",)
+    list_filter = (
+        "student_status",
+        "sync_status",
+    )
+
     list_select_related = ("user",)
 
     search_fields = (
@@ -134,7 +214,7 @@ class StudentProfileAdmin(admin.ModelAdmin):
         "user__last_name",
     )
 
-    fields = (
+    readonly_fields = (
         "user",
         "gpa",
         "gpa_source",
@@ -146,17 +226,27 @@ class StudentProfileAdmin(admin.ModelAdmin):
         "photo_updated_at",
     )
 
-    readonly_fields = fields
+    fields = readonly_fields + SMARTGATE_PROFILE_FIELDS
+
     actions = None
 
     def has_add_permission(self, request):
         return False
 
-    def has_change_permission(self, request, obj=None):
-        return False
-
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def save_model(self, request, obj, form, change):
+        # Обновляем только отредактированные поля.
+        # Фото, GPA и результаты синхронизации не перезаписываем.
+        changed_fields = [
+            name
+            for name in form.changed_data
+            if name in SMARTGATE_PROFILE_FIELDS
+        ]
+
+        if changed_fields:
+            obj.save(update_fields=changed_fields)
 
 
 admin.site.site_header = "Altyn — администрирование"
