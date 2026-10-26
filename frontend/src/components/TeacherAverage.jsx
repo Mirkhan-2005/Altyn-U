@@ -11,7 +11,7 @@ export default function TeacherAverage({ statistics }) {
   return (
     <div className="teacher-average">
       <span className="teacher-average-label">
-        Средний балл
+        Расчётный средний балл
       </span>
 
       {available ? (
@@ -36,7 +36,9 @@ export default function TeacherAverage({ statistics }) {
       )}
 
       <span className="teacher-average-note">
-        ТК1/ТК2 прошлых обычных периодов · текущий исключён
+        Прошлые обычные периоды: ТК1/ТК2, а при пустом ТК —
+        среднее числовых недельных оценок соответствующего блока.
+        Текущий период исключён.
       </span>
     </div>
   );

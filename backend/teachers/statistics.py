@@ -20,6 +20,43 @@ def _mean(values):
     return sum(values, Decimal("0")) / len(values)
 
 
+def _number(cell):
+    """Возвращает числовую оценку, включая 0."""
+    if cell is None:
+        return None
+
+    kind, value = cell
+
+    if (
+        kind == "number"
+        and value is not None
+        and Decimal("0") <= value <= Decimal("100")
+    ):
+        return value
+
+    return None
+
+
+def _block_score(columns, tk_column, weeks):
+    tk = columns.get(tk_column)
+
+    # Заполненный ТК имеет приоритет, включая числовой ноль.
+    # Неизвестное непустое обозначение не заменяем
+    # недельными оценками.
+    if tk is not None and tk[0] != "empty":
+        return _number(tk)
+
+    grades = []
+
+    for week in weeks:
+        score = _number(columns.get(str(week)))
+
+        if score is not None:
+            grades.append(score)
+
+    return _mean(grades) if grades else None
+
+
 def get_teacher_grade_statistics(teacher_ids):
     result = {
         teacher_id: empty_statistics()
@@ -59,13 +96,14 @@ def get_teacher_grade_statistics(teacher_ids):
             eligible,
             lesson_row__subject__snapshot__year__gte=2000,
             lesson_row__subject__snapshot__term__in=(1, 2),
-            source_column__in=("ТК1", "ТК2"),
+            source_column__in=(
+                "ТК1",
+                "ТК2",
+                *(str(week) for week in range(1, 16)),
+            ),
             lesson_row__teacher_id__in=result,
             lesson_row__subject__snapshot__last_synced_at__isnull=False,
             lesson_row__subject__snapshot__user__is_active=True,
-            value_kind="number",
-            numeric_value__gte=0,
-            numeric_value__lte=100,
         )
         .order_by()
         .values_list(
@@ -75,14 +113,28 @@ def get_teacher_grade_statistics(teacher_ids):
             "lesson_row__subject__snapshot__term",
             "lesson_row__subject__source_name",
             "lesson_row_id",
+            "source_column",
+            "value_kind",
             "numeric_value",
         )
     )
 
-    # 1. Усредняем доступные ТК строки за прошлый период.
-    rows = defaultdict(list)
+    # 1. Собираем оценки каждой строки преподавателя.
+    rows = defaultdict(dict)
 
-    for teacher, student, year, term, subject, row, value in values.iterator():
+    for record in values.iterator():
+        (
+            teacher,
+            student,
+            year,
+            term,
+            subject,
+            row,
+            column,
+            kind,
+            value,
+        ) = record
+
         key = (
             teacher,
             student,
@@ -92,18 +144,33 @@ def get_teacher_grade_statistics(teacher_ids):
             row,
         )
 
-        rows[key].append(value)
+        rows[key][column] = (kind, value)
 
-    # 2. Объединяем строки одного предмета и периода.
+    # 2. Рассчитываем оба блока отдельно.
+    # Затем объединяем строки одного предмета и периода.
     observations = defaultdict(list)
 
-    for key, grades in rows.items():
-        observations[key[:-1]].append(_mean(grades))
+    for key, columns in rows.items():
+        scores = [
+            _block_score(columns, "ТК1", range(1, 8)),
+            _block_score(columns, "ТК2", range(8, 16)),
+        ]
+
+        available = [
+            score
+            for score in scores
+            if score is not None
+        ]
+
+        if available:
+            observations[key[:-1]].append(_mean(available))
 
     # 3. Объединяем предметы и периоды каждого студента.
     students = defaultdict(list)
 
-    for (teacher, student, year, term, subject), grades in observations.items():
+    for key, grades in observations.items():
+        teacher, student, year, term, subject = key
+
         students[(teacher, student)].append(_mean(grades))
         result[teacher]["observations_count"] += 1
 
@@ -122,7 +189,9 @@ def get_teacher_grade_statistics(teacher_ids):
                 )
             ),
             "students_count": len(grades),
-            "observations_count": result[teacher]["observations_count"],
+            "observations_count": (
+                result[teacher]["observations_count"]
+            ),
         }
 
     return result
