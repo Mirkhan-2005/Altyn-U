@@ -3,11 +3,7 @@ from django.urls import include, path
 
 from accounts.smartgate_api import (
     SmartGateConnectionView,
-    SmartGateStudentDetailView,
-)
-
-from accounts.smartgate_api import (
-    SmartGateConnectionView,
+    SmartGateStudentListView,
     SmartGateStudentDetailView,
     SmartGateStudentPhotoView,
 )
@@ -22,6 +18,12 @@ urlpatterns = [
         "api/integrations/smartgate/connection",
         SmartGateConnectionView.as_view(),
         name="smartgate-connection",
+    ),
+
+    path(
+        "api/integrations/smartgate/students",
+        SmartGateStudentListView.as_view(),
+        name="smartgate-student-list",
     ),
 
     path(

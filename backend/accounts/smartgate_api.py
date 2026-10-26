@@ -252,3 +252,81 @@ class SmartGateStudentPhotoView(SmartGateBaseView):
         response["ETag"] = f'"{version}"'
 
         return response
+    
+
+
+class SmartGateStudentListView(SmartGateBaseView):
+    """Список студентов для полного обхода и импорта."""
+
+    PAGE_SIZE = 50
+
+    def get(self, request):
+        raw_after_id = request.query_params.get("after_id", "0")
+
+        if (
+            not raw_after_id.isascii()
+            or not raw_after_id.isdecimal()
+            or len(raw_after_id) > 19
+        ):
+            return Response(
+                {"detail": "after_id должен быть целым неотрицательным числом."},
+                status=400,
+            )
+
+        after_id = int(raw_after_id)
+
+        if after_id > 9223372036854775807:
+            return Response(
+                {"detail": "Недопустимое значение after_id."},
+                status=400,
+            )
+
+        # Берём профили студентов, а не всех пользователей сайта.
+        # Дополнительная запись позволяет определить наличие следующей страницы.
+        profiles = list(
+            StudentProfile.objects
+            .select_related("user")
+            .filter(user_id__gt=after_id)
+            .order_by("user_id")[:self.PAGE_SIZE + 1]
+        )
+
+        has_more = len(profiles) > self.PAGE_SIZE
+        page = profiles[:self.PAGE_SIZE]
+        now = timezone.now()
+        results = []
+
+        for profile in page:
+            # Те же условия доступа, что у получения одного студента.
+            consent_valid = (
+                profile.smartgate_consent_at is not None
+                and profile.smartgate_consent_at <= now
+                and bool(profile.smartgate_consent_version.strip())
+                and bool(profile.smartgate_consent_reference.strip())
+                and profile.smartgate_consent_revoked_at is None
+            )
+
+            if not consent_valid:
+                continue
+
+            status = get_smartgate_status(profile)
+
+            results.append({
+                "id": str(profile.user_id),
+                "first_name": profile.user.first_name,
+                "last_name": profile.user.last_name,
+                "middle_name": profile.middle_name or None,
+                "faculty": profile.faculty or None,
+                "course": profile.course,
+                "student_status": status,
+                "access_allowed": status == "active",
+            })
+
+        return Response(
+            {
+                "results": results,
+                "next_after_id": (
+                    str(page[-1].user_id) if has_more else None
+                ),
+            },
+            content_type="application/json; charset=utf-8",
+        )
