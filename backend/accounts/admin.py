@@ -192,6 +192,8 @@ class StudentProfileAdmin(admin.ModelAdmin):
     form = StudentProfileAdminForm
 
     list_display = (
+        "altyn_id",
+        "student_full_name",
         "user",
         "student_status",
         "faculty",
@@ -229,6 +231,27 @@ class StudentProfileAdmin(admin.ModelAdmin):
     fields = readonly_fields + SMARTGATE_PROFILE_FIELDS
 
     actions = None
+
+    @admin.display(description="ID Altyn", ordering="user_id")
+    def altyn_id(self, obj):
+        return obj.user_id
+
+    @admin.display(
+        description="ФИО",
+        ordering="user__last_name",
+    )
+    def student_full_name(self, obj):
+        name = " ".join(
+            part
+            for part in (
+                obj.user.last_name,
+                obj.user.first_name,
+                obj.middle_name,
+            )
+            if part
+        )
+
+        return name or "Не загружено"
 
     def has_add_permission(self, request):
         return False
