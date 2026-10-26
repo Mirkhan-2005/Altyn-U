@@ -26,19 +26,32 @@ class ProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentProfile
+
         fields = (
             "first_name",
             "last_name",
+            "middle_name",
             "gpa",
             "gpa_source",
             "photo_url",
+            "course",
+            "degree",
+            "education_program",
+            "education_program_code",
+            "education_program_group",
+            "education_program_group_code",
+            "study_form",
+            "study_language",
+            "academic_year",
             "last_synced_at",
             "gpa_updated_at",
             "photo_updated_at",
+            "academic_updated_at",
             "last_sync_attempt_at",
             "sync_status",
             "sync_message",
         )
+
         read_only_fields = fields
 
     def get_photo_url(self, obj):

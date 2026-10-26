@@ -118,7 +118,95 @@ def delete_photo(storage, name):
             logging.getLogger(__name__).warning(
                 "Не удалось удалить старый файл фото."
             )
+def prepare_academic_updates(data, warnings):
+    updates = {}
 
+    # Не затираем прежнее отчество, если новое не удалось извлечь.
+    middle_name = data.get("middle_name")
+
+    if middle_name is not None:
+        limit = StudentProfile._meta.get_field(
+            "middle_name"
+        ).max_length
+
+        if (
+            isinstance(middle_name, str)
+            and middle_name.strip()
+            and len(middle_name.strip()) <= limit
+        ):
+            updates["middle_name"] = middle_name.strip()
+        else:
+            warnings.append(
+                "Отчество не обновлено: неподдерживаемый формат."
+            )
+
+    academic = data.get("academic")
+
+    if academic is None:
+        return updates, False
+
+    fields = (
+        "course",
+        "degree",
+        "education_program",
+        "education_program_code",
+        "education_program_group",
+        "education_program_group_code",
+        "study_form",
+        "study_language",
+        "academic_year",
+    )
+
+    required = {
+        "course",
+        "education_program",
+        "education_program_code",
+    }
+
+    academic_updates = {}
+
+    if not isinstance(academic, dict):
+        warnings.append(
+            "Учебные данные не обновлены: неподдерживаемый формат."
+        )
+        return updates, False
+
+    for name in fields:
+        value = academic.get(name)
+
+        if isinstance(value, str):
+            value = value.strip()
+
+        # Отсутствующее необязательное поле сохраняет старое значение.
+        if value is None or value == "":
+            if name in required:
+                warnings.append(
+                    "Учебные данные не обновлены: "
+                    "отсутствуют обязательные поля."
+                )
+                return updates, False
+
+            continue
+
+        if name == "course":
+            valid = type(value) is int and 1 <= value <= 99
+        else:
+            limit = StudentProfile._meta.get_field(name).max_length
+            valid = isinstance(value, str) and len(value) <= limit
+
+        if not valid:
+            warnings.append(
+                "Учебные данные не обновлены: "
+                "неподдерживаемый формат поля."
+            )
+            return updates, False
+
+        academic_updates[name] = value
+
+    # Добавляем учебные поля только после проверки всего набора.
+    updates.update(academic_updates)
+
+    return updates, True
 
 def sync_profile(user):
     if not user.is_active:
@@ -135,6 +223,10 @@ def sync_profile(user):
 
     try:
         data, photo, warnings = download_profile(user)
+        profile_updates, academic_loaded = prepare_academic_updates(
+            data,
+            warnings,
+        )
 
         User = get_user_model()
         names = {}
@@ -196,6 +288,12 @@ def sync_profile(user):
             if new_photo is not None:
                 profile.photo.name = new_photo
                 profile.photo_updated_at = now
+
+            for field_name, value in profile_updates.items():
+                setattr(profile, field_name, value)
+
+            if academic_loaded:
+                profile.academic_updated_at = now
 
             profile.last_synced_at = now
             profile.sync_status = "partial" if warnings else "synced"

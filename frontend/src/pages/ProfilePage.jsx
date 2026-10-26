@@ -4,6 +4,19 @@ import { syncProfile } from "../api/client";
 import { watchProfile } from "../api/watchProfile";
 import StudentPhoto from "../components/StudentPhoto";
 
+const ACADEMIC_FIELDS = [
+  ["course", "Курс"],
+  ["degree", "Академическая степень"],
+  ["education_program", "Образовательная программа"],
+  ["education_program_code", "Код образовательной программы"],
+  ["education_program_group", "Группа образовательных программ"],
+  ["education_program_group_code", "Код группы образовательных программ"],
+  ["study_form", "Форма обучения"],
+  ["study_language", "Язык обучения"],
+  ["academic_year", "Учебный год"],
+];
+
+
 function formatDate(value) {
   if (!value) return "Ещё не обновлялось";
 
@@ -151,19 +164,22 @@ export default function ProfilePage({ onSessionExpired }) {
           )}
 
           <div className="profile-details">
+            <h2>Личные данные</h2>
+
             <dl>
               <div>
                 <dt>Имя</dt>
-                <dd>
-                  {profile.first_name || "Пока не загружено"}
-                </dd>
+                <dd>{profile.first_name || "—"}</dd>
               </div>
 
               <div>
                 <dt>Фамилия</dt>
-                <dd>
-                  {profile.last_name || "Пока не загружена"}
-                </dd>
+                <dd>{profile.last_name || "—"}</dd>
+              </div>
+
+              <div>
+                <dt>Отчество</dt>
+                <dd>{profile.middle_name || "—"}</dd>
               </div>
 
               <div>
@@ -172,6 +188,17 @@ export default function ProfilePage({ onSessionExpired }) {
                   {profile.gpa ?? "—"}
                 </dd>
               </div>
+            </dl>
+
+            <h2>Учебные данные</h2>
+
+            <dl>
+              {ACADEMIC_FIELDS.map(([field, label]) => (
+                <div key={field}>
+                  <dt>{label}</dt>
+                  <dd>{profile[field] || "—"}</dd>
+                </div>
+              ))}
             </dl>
 
             <p>
@@ -187,6 +214,11 @@ export default function ProfilePage({ onSessionExpired }) {
             <p>
               Фото обновлено:{" "}
               {formatDate(profile.photo_updated_at)}
+            </p>
+            
+            <p>
+              Учебные данные обновлены:{" "}
+              {formatDate(profile.academic_updated_at)}
             </p>
 
             {profile.sync_status === "pending" && (

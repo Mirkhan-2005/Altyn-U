@@ -115,6 +115,68 @@ class StudentProfile(models.Model):
         validators=[MinValueValidator(1)],
     )
 
+    degree = models.CharField(
+        verbose_name="Академическая степень",
+        max_length=150,
+        blank=True,
+        default="",
+    )
+
+    education_program = models.CharField(
+        verbose_name="Образовательная программа",
+        max_length=500,
+        blank=True,
+        default="",
+    )
+
+    education_program_code = models.CharField(
+        verbose_name="Код образовательной программы",
+        max_length=32,
+        blank=True,
+        default="",
+    )
+
+    education_program_group = models.CharField(
+        verbose_name="Группа образовательных программ",
+        max_length=500,
+        blank=True,
+        default="",
+    )
+
+    education_program_group_code = models.CharField(
+        verbose_name="Код группы образовательных программ",
+        max_length=32,
+        blank=True,
+        default="",
+    )
+
+    study_form = models.CharField(
+        verbose_name="Форма обучения",
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    study_language = models.CharField(
+        verbose_name="Язык обучения",
+        max_length=100,
+        blank=True,
+        default="",
+    )
+
+    academic_year = models.CharField(
+        verbose_name="Учебный год",
+        max_length=9,
+        blank=True,
+        default="",
+    )
+
+    academic_updated_at = models.DateTimeField(
+        verbose_name="Дата обновления учебных данных",
+        null=True,
+        blank=True,
+    )
+
     # Управляемый статус студента в Altyn.
     student_status = models.CharField(
         verbose_name="Статус студента",
