@@ -30,6 +30,7 @@ class AltynUserAdmin(UserAdmin):
     form = AltynUserChangeForm
 
     list_display = (
+        "id",
         "iin",
         "first_name",
         "last_name",
