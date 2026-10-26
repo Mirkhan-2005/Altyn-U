@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from django.utils import timezone
 
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import APIException, NotFound
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
@@ -13,6 +13,12 @@ from .smartgate_auth import (
     IsSmartGateService,
     SmartGateAuthentication,
 )
+
+import hashlib
+from pathlib import Path
+
+from django.http import HttpResponse
+from django.urls import reverse
 
 
 # Отдельный журнал в вывод контейнера.
@@ -77,45 +83,115 @@ class SmartGateConnectionView(SmartGateBaseView):
         )
 
 
+MAX_SMARTGATE_PHOTO_BYTES = 5_000_000
+
+
+class SmartGatePhotoUnavailable(APIException):
+    status_code = 503
+    default_detail = "Фотография временно недоступна."
+    default_code = "photo_unavailable"
+
+
+def get_smartgate_profile(student_id):
+    if not 1 <= student_id <= 9223372036854775807:
+        raise NotFound("Студент недоступен.")
+
+    profile = (
+        StudentProfile.objects
+        .select_related("user")
+        .filter(user_id=student_id)
+        .first()
+    )
+
+    if profile is None:
+        raise NotFound("Студент недоступен.")
+
+    consent_valid = (
+        profile.smartgate_consent_at is not None
+        and profile.smartgate_consent_at <= timezone.now()
+        and bool(profile.smartgate_consent_version.strip())
+        and bool(profile.smartgate_consent_reference.strip())
+        and profile.smartgate_consent_revoked_at is None
+    )
+
+    if not consent_valid:
+        raise NotFound("Студент недоступен.")
+
+    return profile
+
+
+def get_smartgate_status(profile):
+    if profile.student_status == "blocked":
+        return "blocked"
+
+    if (
+        not profile.user.is_active
+        or profile.student_status != "active"
+    ):
+        return "inactive"
+
+    return "active"
+
+
+def read_smartgate_photo(profile):
+    if not profile.photo:
+        return None
+
+    content_type = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }.get(Path(profile.photo.name).suffix.lower())
+
+    if content_type is None:
+        raise SmartGatePhotoUnavailable()
+
+    try:
+        with profile.photo.open("rb") as photo:
+            content = photo.read(MAX_SMARTGATE_PHOTO_BYTES + 1)
+
+    except FileNotFoundError:
+        return None
+
+    except OSError:
+        raise SmartGatePhotoUnavailable() from None
+
+    if not content or len(content) > MAX_SMARTGATE_PHOTO_BYTES:
+        raise SmartGatePhotoUnavailable()
+
+    # Версия зависит от байтов фотографии, а не даты синхронизации.
+    version = hashlib.sha256(content).hexdigest()
+
+    return content, content_type, version
+
+
 class SmartGateStudentDetailView(SmartGateBaseView):
     def get(self, request, student_id):
-        if not 1 <= student_id <= 9223372036854775807:
-            raise NotFound("Студент недоступен.")
-
-        profile = (
-            StudentProfile.objects
-            .select_related("user")
-            .filter(user_id=student_id)
-            .first()
-        )
-
-        if profile is None:
-            raise NotFound("Студент недоступен.")
-
-        # Передача данных разрешена только при наличии
-        # заполненного и не отозванного согласия.
-        consent_valid = (
-            profile.smartgate_consent_at is not None
-            and profile.smartgate_consent_at <= timezone.now()
-            and bool(profile.smartgate_consent_version.strip())
-            and bool(profile.smartgate_consent_reference.strip())
-            and profile.smartgate_consent_revoked_at is None
-        )
-
-        if not consent_valid:
-            raise NotFound("Студент недоступен.")
-
+        profile = get_smartgate_profile(student_id)
         user = profile.user
+        student_status = get_smartgate_status(profile)
 
-        if profile.student_status == "blocked":
-            student_status = "blocked"
-        elif (
-            not user.is_active
-            or profile.student_status != "active"
-        ):
-            student_status = "inactive"
-        else:
-            student_status = "active"
+        # Статус блокировки передаём, но фотографию не выдаём.
+        photo = (
+            read_smartgate_photo(profile)
+            if student_status == "active"
+            else None
+        )
+
+        photo_url = None
+        photo_version = None
+
+        if photo is not None:
+            photo_version = photo[2]
+
+            photo_url = (
+                reverse(
+                    "smartgate-student-photo",
+                    kwargs={"student_id": user.pk},
+                )
+                + f"?version={photo_version}"
+            )
 
         return Response(
             {
@@ -127,6 +203,52 @@ class SmartGateStudentDetailView(SmartGateBaseView):
                 "course": profile.course,
                 "student_status": student_status,
                 "access_allowed": student_status == "active",
+                "photo_url": photo_url,
+                "photo_version": photo_version,
+                "photo_updated_at": profile.photo_updated_at,
             },
             content_type="application/json; charset=utf-8",
         )
+
+
+class SmartGateStudentPhotoView(SmartGateBaseView):
+    def get(self, request, student_id):
+        profile = get_smartgate_profile(student_id)
+
+        if get_smartgate_status(profile) != "active":
+            raise NotFound("Фотография недоступна.")
+
+        photo = read_smartgate_photo(profile)
+
+        if photo is None:
+            raise NotFound("Фотография недоступна.")
+
+        content, content_type, version = photo
+
+        requested_version = request.query_params.get("version")
+
+        # Между получением JSON и скачиванием фото могло обновиться.
+        if (
+            requested_version is not None
+            and requested_version != version
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "Фотография изменилась. "
+                        "Повторно получите данные студента."
+                    ),
+                },
+                status=409,
+            )
+
+        response = HttpResponse(
+            content,
+            content_type=content_type,
+        )
+
+        response["X-Content-Type-Options"] = "nosniff"
+        response["X-Photo-Version"] = version
+        response["ETag"] = f'"{version}"'
+
+        return response

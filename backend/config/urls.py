@@ -6,6 +6,11 @@ from accounts.smartgate_api import (
     SmartGateStudentDetailView,
 )
 
+from accounts.smartgate_api import (
+    SmartGateConnectionView,
+    SmartGateStudentDetailView,
+    SmartGateStudentPhotoView,
+)
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -23,5 +28,10 @@ urlpatterns = [
         "api/integrations/smartgate/students/<int:student_id>",
         SmartGateStudentDetailView.as_view(),
         name="smartgate-student-detail",
+    ),
+    path(
+        "api/integrations/smartgate/students/<int:student_id>/photo",
+        SmartGateStudentPhotoView.as_view(),
+        name="smartgate-student-photo",
     ),
 ]
