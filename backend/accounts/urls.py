@@ -1,5 +1,5 @@
 from django.urls import path
-
+from .password_reset_api import PasswordResetView
 from .views import (
     health_check,
     PlatonusVerifyView,
@@ -50,5 +50,10 @@ urlpatterns = [
         "profile/photo/",
         ProfilePhotoView.as_view(),
         name="profile-photo",
+    ),
+    path(
+        "password/reset/",
+        PasswordResetView.as_view(),
+        name="password-reset",
     ),
 ]

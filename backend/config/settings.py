@@ -171,6 +171,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "CHECK_REVOKE_TOKEN": True,
 }
 
 

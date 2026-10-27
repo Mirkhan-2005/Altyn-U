@@ -173,3 +173,29 @@ export const getPhoto = (signal) =>
     binary: true,
     signal,
   });
+
+
+export async function resetAltynPassword(
+  iin,
+  platonusPassword,
+  newPassword,
+  newPasswordConfirm,
+  signal,
+) {
+  const data = await request("password/reset/", {
+    method: "POST",
+    signal,
+    body: {
+      iin,
+      platonus_password: platonusPassword,
+      new_password: newPassword,
+      new_password_confirm: newPasswordConfirm,
+    },
+  });
+
+  if (data.status !== "password_changed") {
+    throw new Error("Смена пароля не подтверждена сервером.");
+  }
+
+  return data;
+}

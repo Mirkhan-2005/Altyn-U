@@ -2,12 +2,14 @@ import { useState } from "react";
 
 import { loginAltyn } from "../api/client";
 import PasswordField from "../components/PasswordField";
+import PasswordResetForm from "./PasswordResetForm";
 
 export default function LoginPage({
   onNavigate,
   onAuthenticated,
   initialMessage = "",
 }) {
+  const [recovering, setRecovering] = useState(false);
   const [iin, setIin] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -35,6 +37,28 @@ export default function LoginPage({
       setPassword("");
       setBusy(false);
     }
+  }
+
+  if (recovering) {
+    return (
+      <PasswordResetForm
+        initialIin={iin}
+        onBack={() => {
+          setRecovering(false);
+          setPassword("");
+          setMessage("");
+        }}
+        onSuccess={(studentIin, resultMessage) => {
+          setIin(studentIin);
+          setPassword("");
+          setMessage(
+            resultMessage ||
+              "Пароль изменён. Войдите с новым паролем.",
+          );
+          setRecovering(false);
+        }}
+      />
+    );
   }
 
   return (
@@ -99,6 +123,20 @@ export default function LoginPage({
           {busy ? "Входим…" : "Войти"}
         </button>
       </form>
+
+      <button
+        type="button"
+        className="button button-secondary"
+        style={{ marginTop: 12 }}
+        disabled={busy}
+        onClick={() => {
+          setPassword("");
+          setMessage("");
+          setRecovering(true);
+        }}
+      >
+        Забыли пароль?
+      </button>
 
       <div className="auth-divider">
         <span>Ещё нет аккаунта?</span>
