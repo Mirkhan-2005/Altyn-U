@@ -1,8 +1,6 @@
 import logging
 from uuid import uuid4
 
-from django.utils import timezone
-
 from rest_framework.exceptions import APIException, NotFound
 from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
@@ -104,17 +102,6 @@ def get_smartgate_profile(student_id):
     )
 
     if profile is None:
-        raise NotFound("Студент недоступен.")
-
-    consent_valid = (
-        profile.smartgate_consent_at is not None
-        and profile.smartgate_consent_at <= timezone.now()
-        and bool(profile.smartgate_consent_version.strip())
-        and bool(profile.smartgate_consent_reference.strip())
-        and profile.smartgate_consent_revoked_at is None
-    )
-
-    if not consent_valid:
         raise NotFound("Студент недоступен.")
 
     return profile
@@ -292,22 +279,9 @@ class SmartGateStudentListView(SmartGateBaseView):
 
         has_more = len(profiles) > self.PAGE_SIZE
         page = profiles[:self.PAGE_SIZE]
-        now = timezone.now()
         results = []
 
         for profile in page:
-            # Те же условия доступа, что у получения одного студента.
-            consent_valid = (
-                profile.smartgate_consent_at is not None
-                and profile.smartgate_consent_at <= now
-                and bool(profile.smartgate_consent_version.strip())
-                and bool(profile.smartgate_consent_reference.strip())
-                and profile.smartgate_consent_revoked_at is None
-            )
-
-            if not consent_valid:
-                continue
-
             status = get_smartgate_status(profile)
 
             results.append({
