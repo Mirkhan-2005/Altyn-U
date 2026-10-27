@@ -157,10 +157,21 @@ deploy:
       compose ps -a
       REMOTE
 
-    # Проверяем сайт после Deploy
+
+
+    # Проверяем сайт и только после успеха очищаем старые образы
     - |
       echo 'Checking public website...'
+
       curl --fail --silent --show-error \
         --connect-timeout 10 --max-time 20 \
         --retry 5 --retry-delay 5 --retry-all-errors \
-        https://altyn.dpdns.org/api/accounts/health/
+        https://altyn.dpdns.org/api/accounts/health/ || exit 1
+
+      echo 'Cleaning unused Docker images on AWS EC2...'
+
+      ssh_prod "docker image prune -a -f"
+
+      echo 'Docker disk usage:'
+
+      ssh_prod "docker system df"
