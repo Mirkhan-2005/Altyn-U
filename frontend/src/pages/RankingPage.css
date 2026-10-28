@@ -1,0 +1,208 @@
+.ranking-page {
+  min-width: 0;
+}
+
+.ranking-heading h1 {
+  margin: 10px 0;
+  font-size: clamp(28px, 4vw, 40px);
+}
+
+.ranking-heading p {
+  max-width: 680px;
+  color: #596579;
+  line-height: 1.6;
+}
+
+.ranking-eyebrow {
+  color: #856019;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+}
+
+.ranking-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+  margin: 26px 0;
+}
+
+.ranking-filters label {
+  display: grid;
+  gap: 8px;
+  min-width: 130px;
+}
+
+.ranking-filters label:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+
+.ranking-filters label > span {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ranking-filters select {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: white;
+  color: #24334a;
+  font: inherit;
+}
+
+.ranking-filters select:focus-visible,
+.ranking-table-wrap:focus-visible {
+  outline: 3px solid #2563eb;
+  outline-offset: 3px;
+}
+
+.ranking-page button:disabled {
+  cursor: default;
+}
+
+.ranking-personal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px 48px;
+  padding: 24px;
+  border: 1px solid #bfdbfe;
+  border-radius: 18px;
+  background: #eff6ff;
+  color: #173b70;
+}
+
+.ranking-personal > div {
+  display: grid;
+  gap: 8px;
+}
+
+.ranking-personal span {
+  font-size: 13px;
+}
+
+.ranking-personal strong {
+  font-size: 30px;
+}
+
+.ranking-personal b {
+  align-self: center;
+}
+
+.ranking-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: white;
+}
+
+.ranking-table {
+  width: 100%;
+  min-width: 700px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.ranking-table th {
+  background: #f8fafc;
+  color: #526176;
+  font-size: 13px;
+}
+
+.ranking-table th,
+.ranking-table td {
+  padding: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ranking-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ranking-me {
+  background: #eff6ff;
+}
+
+.ranking-student {
+  min-width: 240px;
+  max-width: 410px;
+  overflow-wrap: anywhere;
+}
+
+.ranking-student small {
+  display: block;
+  margin-top: 6px;
+  color: #596579;
+  line-height: 1.5;
+}
+
+.ranking-you {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #dbeafe;
+  color: #1e40af;
+  font-size: 12px;
+}
+
+.ranking-position {
+  display: inline-block;
+  min-width: 36px;
+  padding: 7px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.ranking-position[data-top="true"] {
+  border-radius: 10px;
+  background: #fff1cb;
+  color: #78520b;
+}
+
+.ranking-gpa {
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.ranking-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 22px 0;
+}
+
+.ranking-empty {
+  padding: 28px;
+  background: white;
+  border-radius: 16px;
+}
+
+.ranking-footnote {
+  color: #596579;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .ranking-filters label,
+  .ranking-filters label:nth-child(2) {
+    flex: 1 1 100%;
+  }
+
+  .ranking-personal {
+    padding: 20px;
+    gap: 20px;
+  }
+
+  .ranking-table th,
+  .ranking-table td {
+    padding: 12px;
+  }
+}

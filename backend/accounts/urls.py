@@ -12,6 +12,8 @@ from .profile_api import (
     ProfilePhotoView,
 )
 
+from .ranking_api import StudentRankingView
+
 
 app_name = "accounts"
 
@@ -55,5 +57,10 @@ urlpatterns = [
         "password/reset/",
         PasswordResetView.as_view(),
         name="password-reset",
+    ),
+    path(
+        "ranking/",
+        StudentRankingView.as_view(),
+        name="student-ranking",
     ),
 ]

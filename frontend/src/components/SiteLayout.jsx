@@ -8,6 +8,7 @@ export default function SiteLayout({
   const navigation = [
     { page: "home", label: "Главная" },
     { page: "profile", label: "Профиль" },
+    { page: "ranking", label: "Рейтинг" },
     { page: "journal", label: "Журнал" },
     { page: "teachers", label: "Преподаватели" },
     { page: "calculator", label: "Журнал-калькулятор" },

@@ -668,6 +668,7 @@ import JournalPage from "./pages/JournalPage";
 import TeachersPage from "./pages/TeachersPage";
 import TeacherDetailPage from "./pages/TeacherDetailPage";
 import JournalCalculatorPage from "./pages/JournalCalculatorPage";
+import RankingPage from "./pages/RankingPage";
 
 import "./App.css";
 
@@ -679,6 +680,7 @@ const titles = {
   journal: "Журнал",
   teachers: "Преподаватели",
   calculator: "Журнал-калькулятор",
+  ranking: "Рейтинг",
 };
 
 function getTeacherId(page) {
@@ -813,6 +815,10 @@ export default function App() {
         />
       ) : page === "calculator" ? (
         <JournalCalculatorPage
+          onSessionExpired={handleSessionExpired}
+        />
+      ) : page === "ranking" ? (
+        <RankingPage
           onSessionExpired={handleSessionExpired}
         />
       ) : page === "teachers" ? (

@@ -199,3 +199,36 @@ export async function resetAltynPassword(
 
   return data;
 }
+
+
+
+
+
+export async function getStudentRanking(
+  { course = "", program = "", page = 1 } = {},
+  signal,
+) {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: "20",
+  });
+
+  if (course) params.set("course", String(course));
+  if (program) params.set("program", program);
+
+  const data = await request(`ranking/?${params.toString()}`, {
+    auth: true,
+    signal,
+  });
+
+  if (
+    !data ||
+    !Array.isArray(data.results) ||
+    !Array.isArray(data.available_filters?.courses) ||
+    !Array.isArray(data.available_filters?.programs)
+  ) {
+    throw new Error("Сервер вернул некорректный рейтинг.");
+  }
+
+  return data;
+}
