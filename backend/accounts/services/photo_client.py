@@ -63,15 +63,22 @@ class PhotoCheck(ProfileCheck):
             code = exc.code
             exc.close()
 
+            temporary = code in {408, 500, 502, 503, 504}
+
             return Result(
-                "photo_http_error",
+                (
+                    "photo_temporary_error"
+                    if temporary
+                    else "photo_http_error"
+                ),
                 f"Фотография не получена. HTTP {code}.",
             )
 
         except (URLError, TimeoutError, OSError):
             return Result(
-                "photo_unavailable",
-                "Не удалось загрузить фотографию из Platonus.",
+                "photo_temporary_error",
+                "Не удалось загрузить фотографию: "
+                "ошибка сети или превышено время ожидания.",
             )
 
         if len(body) > MAX_PHOTO_RESPONSE_BYTES:

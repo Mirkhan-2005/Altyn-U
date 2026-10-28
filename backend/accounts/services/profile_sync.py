@@ -95,11 +95,28 @@ def download_profile(user):
         photo = client.get_photo()
 
     warnings = list(result.get("warnings", []))
+        # Внутренний признак для фоновой задачи.
+    # В базу данных и API он не записывается.
+    result["profile"]["_photo_retryable"] = (
+        isinstance(photo, Result)
+        and photo.status == "photo_temporary_error"
+    )
 
     if isinstance(photo, Result):
-        warnings.append(
-            "Фото не обновлено; предыдущее фото сохранено, если оно было."
+        # status и message сформированы нашим photo_client.py.
+        # Пароль, токен и содержимое ответа Platonus не записываем.
+        logging.getLogger(__name__).warning(
+            "Не удалось получить фото Platonus: user_id=%s, status=%s, reason=%s",
+            user.pk,
+            photo.status,
+            photo.message,
         )
+
+        warnings.append(
+            f"Фото не обновлено [{photo.status}]: {photo.message} "
+            "Предыдущее фото сохранено, если оно было."
+        )
+
         photo = None
 
     if client.logout_confirmed is not True:
@@ -329,4 +346,10 @@ def sync_profile(user):
         raise error from None
 
     user.refresh_from_db()
+
+    # Временный атрибут Python-объекта, не поле модели.
+    profile.photo_retryable = bool(
+        data.get("_photo_retryable", False)
+    )
+
     return profile
